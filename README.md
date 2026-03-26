@@ -141,7 +141,7 @@ Genesis is not turn-based. When you start it, **11 daemon threads** run simultan
          CLI / API is just ONE input channel
          into this always-running brain
 
-> **⚡ Live Observe:** Genesis V5 automatically starts a **Web Dashboard** on `http://localhost:5000` so you can visually monitor all 11 threads, 8 drives, neurochemicals, working memory, and the 128-dim hidden state of the Personality GRU in real-time.
+> **⚡ Live Observe:** Genesis V5 automatically starts a **Web Dashboard** on `http://localhost:5050` so you can visually monitor all 11 threads, 8 drives, neurochemicals, working memory, and the 128-dim hidden state of the Personality GRU in real-time.
 ```
 
 The CLI is not the brain — it's a window into it. Genesis is thinking, feeling, and aging whether you type or not.
