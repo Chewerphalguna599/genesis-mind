@@ -42,7 +42,7 @@ class CrossModalBinder(nn.Module):
     increasingly dominates.
     """
 
-    def __init__(self, visual_dim: int = 64, auditory_dim: int = 32,
+    def __init__(self, visual_dim: int = 512, auditory_dim: int = 384,
                  output_dim: int = 64, hidden_dim: int = 64):
         super().__init__()
         input_dim = visual_dim + auditory_dim
@@ -90,7 +90,7 @@ class BindingNetwork:
     dissimilar embeddings.
     """
 
-    def __init__(self, visual_dim: int = 64, auditory_dim: int = 32,
+    def __init__(self, visual_dim: int = 512, auditory_dim: int = 384,
                  output_dim: int = 64, lr: float = 0.001):
         self.visual_dim = visual_dim
         self.auditory_dim = auditory_dim

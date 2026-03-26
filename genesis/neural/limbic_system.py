@@ -61,15 +61,21 @@ class LimbicNetwork(nn.Module):
 
 class LimbicSystem:
     """
-    The instinct engine.
+    The emotional and instinctual core.
 
-    Takes raw sensory features and produces an immediate
-    neurochemical response. Trained by the conscious mind's
-    evaluations so that instinct forms over experience.
+    Takes raw sensory features (or concepts) and maps them to
+    four primary neurochemicals:
+        - Dopamine (Reward/Pleasure)
+        - Cortisol (Stress/Pain)
+        - Serotonin (Stability/Confidence)
+        - Oxytocin (Bonding/Trust)
+
+    This network learns to react *before* conscious thought happens.
+    If it sees a snake, it spikes cortisol instantly.
     """
 
-    def __init__(self, visual_dim: int = 64, auditory_dim: int = 32,
-                 lr: float = 0.0005):
+    def __init__(self, visual_dim: int = 512, auditory_dim: int = 384,
+                 hidden_dim: int = 64, lr: float = 0.0005):
         self.visual_dim = visual_dim
         self.auditory_dim = auditory_dim
         input_dim = visual_dim + auditory_dim

@@ -22,8 +22,6 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from genesis.neural.visual_cortex import VisualCortex
-from genesis.neural.auditory_cortex import AuditoryCortex
 from genesis.neural.limbic_system import LimbicSystem
 from genesis.neural.binding_network import BindingNetwork
 from genesis.neural.personality_network import PersonalityNetwork
@@ -35,13 +33,13 @@ class Subconscious:
     """
     The Society of Mind — all neural layers orchestrated.
 
-    This is the complete subconscious pipeline:
+    This is the complete subconscious pipeline sitting ON TOP of
+    pre-trained evolutionary hardware (Whisper & CLIP):
 
-        1. Visual Cortex:    raw frame   → 64-dim visual latent
-        2. Auditory Cortex:  raw audio   → 32-dim auditory latent
-        3. Limbic System:    latents     → neurochemical instinct
-        4. Binding Network:  vis + aud   → 64-dim unified concept
-        5. Personality Net:  concept + limbic + context → response
+        1. Evolutionary Hardware: CLIP (512-dim) & Whisper Text (384-dim)
+        2. Limbic System:    embeddings  → neurochemical instinct
+        3. Binding Network:  vis + aud   → 64-dim unified concept
+        4. Personality Net:  concept + limbic + context → response
 
     All networks train in real-time on every experience.
     The saved weights collectively ARE the personality.
@@ -51,13 +49,11 @@ class Subconscious:
         self.weights_dir = weights_dir
         weights_dir.mkdir(parents=True, exist_ok=True)
 
-        # Layer 1: Subconscious Sentinels
-        self.visual_cortex = VisualCortex(latent_dim=64, lr=0.001)
-        self.auditory_cortex = AuditoryCortex(n_mels=64, latent_dim=32, lr=0.001)
-        self.limbic_system = LimbicSystem(visual_dim=64, auditory_dim=32, lr=0.0005)
+        # Layer 1: Emotional evaluation of raw sensory data
+        self.limbic_system = LimbicSystem(visual_dim=512, auditory_dim=384, lr=0.0005)
 
         # Layer 2: Associative Bridge
-        self.binding_network = BindingNetwork(visual_dim=64, auditory_dim=32, output_dim=64, lr=0.001)
+        self.binding_network = BindingNetwork(visual_dim=512, auditory_dim=384, output_dim=64, lr=0.001)
 
         # Layer 3: Conscious Executive
         self.personality = PersonalityNetwork(
@@ -70,8 +66,6 @@ class Subconscious:
 
         # Total params across all networks
         total_params = (
-            sum(p.numel() for p in self.visual_cortex.parameters()) +
-            sum(p.numel() for p in self.auditory_cortex.parameters()) +
             sum(p.numel() for p in self.limbic_system.network.parameters()) +
             sum(p.numel() for p in self.binding_network.network.parameters()) +
             sum(p.numel() for p in self.personality.network.parameters())
@@ -79,31 +73,24 @@ class Subconscious:
 
         logger.info("═══════════════════════════════════════════════════")
         logger.info("  SUBCONSCIOUS INITIALIZED — %d total parameters", total_params)
-        logger.info("  Layer 1: Visual (%d) + Auditory (%d) + Limbic (%d)",
-                     sum(p.numel() for p in self.visual_cortex.parameters()),
-                     sum(p.numel() for p in self.auditory_cortex.parameters()),
-                     sum(p.numel() for p in self.limbic_system.network.parameters()))
-        logger.info("  Layer 2: Binding (%d)",
-                     sum(p.numel() for p in self.binding_network.network.parameters()))
-        logger.info("  Layer 3: Personality (%d)",
-                     sum(p.numel() for p in self.personality.network.parameters()))
+        logger.info("  Layer 1: Limbic Instinct (%d)", sum(p.numel() for p in self.limbic_system.network.parameters()))
+        logger.info("  Layer 2: Binding (%d)", sum(p.numel() for p in self.binding_network.network.parameters()))
+        logger.info("  Layer 3: Personality (%d)", sum(p.numel() for p in self.personality.network.parameters()))
+        logger.info("  Using CLIP (512) and Text Embeddings (384) as pre-trained hardware.")
         logger.info("═══════════════════════════════════════════════════")
 
     def process_experience(self,
-                           visual_frame: Optional[np.ndarray] = None,
-                           audio_chunk: Optional[np.ndarray] = None,
-                           audio_sr: int = 16000,
+                           clip_embedding: Optional[np.ndarray] = None,
+                           text_embedding: Optional[np.ndarray] = None,
                            context: Optional[np.ndarray] = None,
                            train: bool = True) -> Dict:
         """
-        The full subconscious cascade.
+        The full subconscious cascade on top of pre-trained hardware.
 
-        Takes raw sensory input and flows it through all layers,
-        training each one along the way.
+        Takes embeddings from CLIP and Whisper, and flows them through
+        the plastic neural layers.
 
         Returns a dict with:
-            - visual_latent: 64-dim visual features
-            - auditory_latent: 32-dim auditory features
             - limbic_response: Dict of neurochemical levels
             - concept_embedding: 64-dim unified concept
             - personality_response: 64-dim response from the personality
@@ -111,28 +98,10 @@ class Subconscious:
         """
         result = {}
 
-        # ─── Layer 1: Encode ──────────────────────────────────────
-        # Visual
-        if visual_frame is not None:
-            if train:
-                loss = self.visual_cortex.train_on_frame(visual_frame)
-                result['visual_loss'] = loss
-            visual_latent = self.visual_cortex.encode(visual_frame)
-        else:
-            visual_latent = np.zeros(64, dtype=np.float32)
-        result['visual_latent'] = visual_latent
+        visual_latent = clip_embedding if clip_embedding is not None else np.zeros(512, dtype=np.float32)
+        auditory_latent = text_embedding if text_embedding is not None else np.zeros(384, dtype=np.float32)
 
-        # Auditory
-        if audio_chunk is not None and len(audio_chunk) > 0:
-            if train:
-                loss = self.auditory_cortex.train_on_audio(audio_chunk, audio_sr)
-                result['auditory_loss'] = loss
-            auditory_latent = self.auditory_cortex.encode(audio_chunk, audio_sr)
-        else:
-            auditory_latent = np.zeros(32, dtype=np.float32)
-        result['auditory_latent'] = auditory_latent
-
-        # Limbic (instinct)
+        # ─── Layer 1: Encode (Instinct) ───────────────────────────
         limbic_response = self.limbic_system.react(visual_latent, auditory_latent)
         result['limbic_response'] = limbic_response
 
@@ -174,8 +143,6 @@ class Subconscious:
 
     def save_all(self):
         """Save all neural weights — save the entire personality."""
-        self.visual_cortex.save_weights(self.weights_dir / "visual_cortex.pt")
-        self.auditory_cortex.save_weights(self.weights_dir / "auditory_cortex.pt")
         self.limbic_system.save_weights(self.weights_dir / "limbic_system.pt")
         self.binding_network.save_weights(self.weights_dir / "binding_network.pt")
         self.personality.save_weights(self.weights_dir / "personality.pt")
@@ -183,8 +150,6 @@ class Subconscious:
 
     def _load_all(self):
         """Load all neural weights — restore the personality."""
-        self.visual_cortex.load_weights(self.weights_dir / "visual_cortex.pt")
-        self.auditory_cortex.load_weights(self.weights_dir / "auditory_cortex.pt")
         self.limbic_system.load_weights(self.weights_dir / "limbic_system.pt")
         self.binding_network.load_weights(self.weights_dir / "binding_network.pt")
         self.personality.load_weights(self.weights_dir / "personality.pt")
@@ -193,8 +158,6 @@ class Subconscious:
         """Get comprehensive stats across all neural layers."""
         return {
             "layer_1": {
-                "visual_cortex": self.visual_cortex.get_stats(),
-                "auditory_cortex": self.auditory_cortex.get_stats(),
                 "limbic_system": self.limbic_system.get_stats(),
             },
             "layer_2": {
@@ -207,8 +170,6 @@ class Subconscious:
 
     def get_total_params(self) -> int:
         return (
-            sum(p.numel() for p in self.visual_cortex.parameters()) +
-            sum(p.numel() for p in self.auditory_cortex.parameters()) +
             sum(p.numel() for p in self.limbic_system.network.parameters()) +
             sum(p.numel() for p in self.binding_network.network.parameters()) +
             sum(p.numel() for p in self.personality.network.parameters())

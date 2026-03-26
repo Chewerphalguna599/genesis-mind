@@ -213,20 +213,18 @@ class GenesisMind:
         self.grammar.learn_from_speech(f"this is {word}")
 
         # V3: Neural cascade — train ALL subconscious networks on this experience
-        raw_frame = None
-        if use_camera and self._eyes and hasattr(self._eyes, '_last_frame') and self._eyes._last_frame is not None:
-            raw_frame = self._eyes._last_frame
-
+        # We now use the "Evolutionary Hardware" (CLIP + Text embeddings) as input
         neural_result = self.subconscious.process_experience(
-            visual_frame=raw_frame,
+            clip_embedding=visual_embedding.astype(np.float32) if visual_embedding is not None else None,
+            text_embedding=np.array(text_embedding, dtype=np.float32) if text_embedding else None,
             context=None,
             train=True,
         )
 
         # Train limbic instinct: "this sensory pattern = positive"
         self.subconscious.train_instinct(
-            visual_features=neural_result['visual_latent'],
-            auditory_features=neural_result['auditory_latent'],
+            visual_features=visual_embedding.astype(np.float32) if visual_embedding is not None else None,
+            auditory_features=np.array(text_embedding, dtype=np.float32) if text_embedding else None,
             target_chemicals={
                 "dopamine": self.neurochemistry.dopamine.level,
                 "cortisol": self.neurochemistry.cortisol.level,
@@ -382,8 +380,6 @@ class GenesisMind:
         lines.append("")
         lines.append("  ── Neural Networks (The Person) ──")
         lines.append(f"  Total params:    {self.subconscious.get_total_params():,}")
-        lines.append(f"  Frames seen:     {neural['layer_1']['visual_cortex']['frames_seen']}")
-        lines.append(f"  Audio chunks:    {neural['layer_1']['auditory_cortex']['chunks_heard']}")
         lines.append(f"  Instincts formed: {neural['layer_1']['limbic_system']['training_steps']}")
         lines.append(f"  Bindings made:   {neural['layer_2']['binding_network']['bindings_created']}")
         lines.append(f"  Experiences:     {neural['layer_3']['personality']['total_experiences']}")
