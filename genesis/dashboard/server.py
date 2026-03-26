@@ -5,6 +5,7 @@ from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 import numpy as np
 import torch
+from datetime import datetime
 
 logger = logging.getLogger("genesis.dashboard.server")
 
@@ -68,31 +69,36 @@ class DashboardServer:
             # 1. Core Identity & Phase
             state["core"] = {
                 "phase": mind.development.current_phase,
-                "phase_name": mind.development.get_phase_name(),
-                "age_seconds": (mind.consciousness.birth_time - mind.consciousness.birth_time).seconds if hasattr(mind, 'consciousness') else 0, # Placeholder
+                "phase_name": mind.development.current_phase_name,
+                "age_seconds": (datetime.now() - datetime.fromisoformat(mind.axioms.birth_time)).total_seconds() if hasattr(mind, 'axioms') else 0,
                 "grammar_mode": mind.grammar.mode,
             }
             
             # 2. Neurochemistry (4 functional chemicals)
-            state["neurochemistry"] = mind.neurochemistry.get_emotional_summary()
+            state["neurochemistry"] = {
+                "dopamine": float(mind.neurochemistry.dopamine.level),
+                "cortisol": float(mind.neurochemistry.cortisol.level),
+                "serotonin": float(mind.neurochemistry.serotonin.level),
+                "oxytocin": float(mind.neurochemistry.oxytocin.level)
+            }
             
             # 3. Drive System (8 Maslow Tiers)
             state["drives"] = mind.drives.get_status()
             
             # 4. Emotional State (8-Dim Vector)
-            state["emotions"] = mind.emotional_state.emotional_vector
+            state["emotions"] = mind.emotional_state.get_vector().tolist()
             
             # 5. Attention & Working Memory
             active_slots = [
-                {"concept": item.key, "salience": item.salience, "source": item.modal}
-                for item in mind.working_memory.slots
+                {"concept": item.key, "salience": item.salience, "source": "Mental Buffer"}
+                for item in mind.working_memory.get_active_items()
             ]
             state["working_memory"] = {
                 "capacity": mind.working_memory.capacity,
                 "usage": len(active_slots),
                 "slots": active_slots
             }
-            state["attention_threshold"] = mind.attention.baseline_threshold
+            state["attention_threshold"] = mind.attention.salience_threshold
             
             # 6. Brain Daemon Threads
             threads = {}
@@ -130,8 +136,8 @@ class DashboardServer:
                 },
                 "layer4_world_model": {
                     "params": 91072,
-                    "total_predictions": mind.subconscious.world_model._total_predictions,
-                    "last_loss": float(mind.subconscious.world_model._total_loss / max(1, mind.subconscious.world_model._training_steps))
+                    "total_predictions": mind.subconscious.world_model._predictions_made if hasattr(mind.subconscious, 'world_model') else 0,
+                    "last_loss": float(mind.subconscious.world_model._total_loss / max(1, mind.subconscious.world_model._predictions_made)) if hasattr(mind.subconscious, 'world_model') else 0.0
                 },
                 "meta_controller": {
                     "params": 61957
@@ -152,6 +158,8 @@ class DashboardServer:
             }
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error building state payload: {e}")
             state["error"] = str(e)
             

@@ -556,7 +556,7 @@ class BrainDaemon:
 
                 if salience > 0.4:
                     # 2. Place in Working Memory
-                    self.mind.working_memory.write(text, modal="auditory")
+                    self.mind.working_memory.attend(key=text, content=text, salience=salience)
 
                     # 3. Embed text
                     try:
