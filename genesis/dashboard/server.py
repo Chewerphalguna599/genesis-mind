@@ -93,6 +93,7 @@ class DashboardServer:
             
             # 4. Emotional State (8-Dim Vector)
             state["emotions"] = mind.emotional_state.get_vector().tolist()
+            state["mood_baseline"] = mind.emotional_state.get_mood().tolist()
             
             # 5. Attention & Working Memory
             active_slots = [

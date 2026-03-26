@@ -1,4 +1,4 @@
-// Genesis Mind V5 — Dashboard Application Logic
+// Genesis Mind V7 — Dashboard Application Logic
 
 let emotionChart = null;
 let drivesChart = null;
@@ -37,32 +37,35 @@ const brainOptions = {
         limbic: { size: 20, color: {background: 'rgba(255, 152, 0, 0.8)'} },
         memory: { size: 15, color: {background: 'rgba(186, 104, 200, 0.8)'} },
         hidden: { size: 8, color: {background: 'rgba(79, 195, 247, 0.1)'} },
-        output: { size: 14, color: {background: 'rgba(255, 213, 79, 0.7)'} }
+        output: { size: 14, color: {background: 'rgba(255, 213, 79, 0.7)'} },
+        acoustic: { size: 18, color: {background: 'rgba(0, 230, 118, 0.8)'} },
+        vocoder: { size: 16, color: {background: 'rgba(124, 77, 255, 0.8)'} }
     },
-    physics: false, // Absolutely essential for rigid 128 nodes
+    physics: false,
     interaction: { zoomView: true, dragView: true }
 };
 
 function initNetwork() {
     if (!networkContainer) return;
     
-    // Build the V5.3 Global Neural Architecture
+    // Build the V7 Global Neural Architecture
     let nodes = [];
     let edges = [];
     
-    // Add Title Labels for regions
+    // Region Labels
     nodes.push({id: 'label_senses', label: 'SENSES\nVision/Audio/Body', group: 'label', x: -800, y: -250, font: {size: 16, color: '#fff'}});
     nodes.push({id: 'label_limbic', label: 'LIMBIC SYSTEM\nEmotions & Drives', group: 'label', x: -500, y: -250, font: {size: 16, color: '#fff'}});
     nodes.push({id: 'label_memory', label: 'MEMORY & DREAMS\nSemantic & Episodic', group: 'label', x: -150, y: -250, font: {size: 16, color: '#fff'}});
     nodes.push({id: 'label_hidden', label: 'SUBCONSCIOUS CORE\n128-dim GRU', group: 'label', x: 250, y: -250, font: {size: 16, color: '#fff'}});
     nodes.push({id: 'label_world', label: 'WORLD MODEL\nPredictions', group: 'label', x: 650, y: -250, font: {size: 16, color: '#fff'}});
+    nodes.push({id: 'label_acoustic', label: 'V7: ACOUSTIC PIPELINE\nHear → Think → Speak', group: 'label', x: -800, y: 200, font: {size: 16, color: '#00e676'}});
 
-    // 1. Sensory Input Layer (3 nodes)
+    // 1. Sensory Input Layer
     nodes.push({id: 'sens_vision', label: 'Vision', group: 'senses', x: -800, y: -100});
     nodes.push({id: 'sens_audio', label: 'Audio', group: 'senses', x: -800, y: 0});
     nodes.push({id: 'sens_body', label: 'Body', group: 'senses', x: -800, y: 100});
     
-    // 2. Limbic System Layer (3 nodes: Dopamine, Cortisol, Pineal/Sleep)
+    // 2. Limbic System Layer
     nodes.push({id: 'limbic_vta', label: 'VTA (Reward)', group: 'limbic', x: -500, y: -100});
     nodes.push({id: 'limbic_amygdala', label: 'Amygdala (Fear)', group: 'limbic', x: -500, y: 0});
     nodes.push({id: 'limbic_pineal', label: 'Pineal (Sleep)', group: 'limbic', x: -500, y: 100});
@@ -73,7 +76,7 @@ function initNetwork() {
     edges.push({from: 'sens_body', to: 'limbic_pineal'});
     edges.push({from: 'sens_body', to: 'limbic_vta'});
     
-    // 3. Hidden State (128 nodes, 16x8 grid) at X: 100
+    // 3. Hidden State (128 nodes, 16x8 grid)
     let hIdx = 0;
     for (let col = 0; col < 16; col++) {
         for (let row = 0; row < 8; row++) {
@@ -105,7 +108,7 @@ function initNetwork() {
         }
     }
     
-    // 4. World Model / Output (8 nodes) at X: 650
+    // 4. World Model / Output
     for (let i = 0; i < 8; i++) {
         nodes.push({id: `out_${i}`, label: `P_${i}`, group: 'output', x: 650, y: (i * 30) - 105, title: `Prediction Node ${i}`});
     }
@@ -117,12 +120,63 @@ function initNetwork() {
         }
     }
 
+    // ═══════════════════════════════════════════
+    // V7: ACOUSTIC NEURAL PIPELINE (bottom row)
+    // ═══════════════════════════════════════════
+    
+    // Auditory Cortex (Mel Encoder)
+    nodes.push({id: 'ac_mic', label: '🎤 Mic', group: 'senses', x: -800, y: 300, title: 'Microphone Input (16kHz)'});
+    nodes.push({id: 'ac_mel', label: 'Mel Filter\n80 bands', group: 'acoustic', x: -600, y: 300, title: 'Mel Spectrogram (138K params)'});
+    nodes.push({id: 'ac_enc', label: 'Conv1D\nEncoder', group: 'acoustic', x: -400, y: 300, title: 'Auditory Cortex Encoder → 64-dim'});
+    
+    // VQ Codebook
+    nodes.push({id: 'ac_vq', label: 'VQ Codebook\n256 Phonemes', group: 'acoustic', x: -150, y: 300, title: 'Vector Quantized Codebook (16K params)'});
+    
+    // Acoustic Transformer (4 layers displayed)
+    for (let i = 0; i < 4; i++) {
+        nodes.push({
+            id: `ac_tf_${i}`, 
+            label: `TF Layer ${i+1}`, 
+            group: 'acoustic', 
+            x: 100 + (i * 100), 
+            y: 300,
+            title: `Transformer Layer ${i+1} (4 heads, 128-dim)`
+        });
+    }
+    
+    // Neural Vocoder
+    nodes.push({id: 'ac_recon', label: 'Mel Recon', group: 'vocoder', x: 550, y: 300, title: 'Mel Reconstructor (130K params)'});
+    nodes.push({id: 'ac_gl', label: 'Griffin-Lim', group: 'vocoder', x: 700, y: 300, title: 'Phase Reconstruction'});
+    nodes.push({id: 'ac_spk', label: '🔊 Speaker', group: 'senses', x: 850, y: 300, title: 'Audio Output'});
+    
+    // Wire acoustic pipeline
+    edges.push({from: 'ac_mic', to: 'ac_mel', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_mel', to: 'ac_enc', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_enc', to: 'ac_vq', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_vq', to: 'ac_tf_0', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_tf_0', to: 'ac_tf_1', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_tf_1', to: 'ac_tf_2', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_tf_2', to: 'ac_tf_3', color: 'rgba(0, 230, 118, 0.4)'});
+    edges.push({from: 'ac_tf_3', to: 'ac_recon', color: 'rgba(124, 77, 255, 0.4)'});
+    edges.push({from: 'ac_recon', to: 'ac_gl', color: 'rgba(124, 77, 255, 0.4)'});
+    edges.push({from: 'ac_gl', to: 'ac_spk', color: 'rgba(124, 77, 255, 0.4)'});
+    
+    // Cross-connections: Audio sense feeds into acoustic pipeline
+    edges.push({from: 'sens_audio', to: 'ac_mic', color: 'rgba(239, 83, 80, 0.3)'});
+    
+    // Self-monitoring loop: speaker output feeds back to encoder
+    edges.push({from: 'ac_spk', to: 'ac_mel', color: 'rgba(255, 213, 79, 0.2)', dashes: true});
+    
+    // VQ tokens connect to the subconscious GRU
+    edges.push({from: 'ac_vq', to: 'h_0', color: 'rgba(0, 230, 118, 0.15)'});
+    edges.push({from: 'ac_vq', to: 'h_8', color: 'rgba(0, 230, 118, 0.15)'});
+    edges.push({from: 'ac_vq', to: 'h_16', color: 'rgba(0, 230, 118, 0.15)'});
+
     nodesData = new vis.DataSet(nodes);
     edgesData = new vis.DataSet(edges);
     
     network = new vis.Network(networkContainer, {nodes: nodesData, edges: edgesData}, brainOptions);
     
-    // Center it nicely after spawn
     setTimeout(() => network.fit({animation: {duration: 1000, easingFunction: 'easeInOutQuad'}}), 500);
 }
 
@@ -164,16 +218,27 @@ function initCharts() {
             type: 'radar',
             data: {
                 labels: ['Joy', 'Excitement', 'Trust', 'Anger', 'Surprise', 'Disgust', 'Interest', 'Love'],
-                datasets: [{
-                    label: 'Current Emotional Vector',
-                    data: [0, 0, 0, 0, 0, 0, 0, 0],
-                    backgroundColor: 'rgba(79, 195, 247, 0.2)',
-                    borderColor: '#4fc3f7',
-                    pointBackgroundColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: '#4fc3f7',
-                    borderWidth: 2,
-                }]
+                datasets: [
+                    {
+                        label: 'Current',
+                        data: [0, 0, 0, 0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(79, 195, 247, 0.2)',
+                        borderColor: '#4fc3f7',
+                        pointBackgroundColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#4fc3f7',
+                        borderWidth: 2,
+                    },
+                    {
+                        label: 'Mood Baseline',
+                        data: [0, 0, 0, 0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(124, 77, 255, 0.1)',
+                        borderColor: 'rgba(124, 77, 255, 0.5)',
+                        pointBackgroundColor: 'rgba(124, 77, 255, 0.6)',
+                        borderWidth: 1,
+                        borderDash: [5, 3],
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -183,10 +248,18 @@ function initCharts() {
                         angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
                         grid: { color: 'rgba(255, 255, 255, 0.1)' },
                         pointLabels: { color: '#f0f0f5', font: { size: 11 } },
-                        ticks: { display: false, max: 1.0, min: -0.2 }
+                        ticks: { display: false },
+                        suggestedMin: -0.1,
+                        suggestedMax: 0.5
                     }
                 },
-                plugins: { legend: { display: false } }
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { color: '#8a8a93', font: { size: 10 } }
+                    }
+                }
             }
         });
     }
@@ -400,6 +473,52 @@ function updateUI(state) {
             const outIntensity = Math.min(0.2 + (loss * 10), 0.9) + (Math.random()*0.2);
             updates.push({id: `out_${i}`, size: 10 + (Math.random() * 4), color: {background: `rgba(255, 213, 79, ${outIntensity})`}});
         }
+
+        // 6. V7: Acoustic Pipeline Node Animation
+        if (state.acoustic_pipeline) {
+            const ap = state.acoustic_pipeline;
+            const hasActivity = (ap.total_interactions || 0) > 0;
+            const baseGlow = hasActivity ? 0.6 : 0.2;
+            const pulse = Math.sin(Date.now() / 500) * 0.2 + 0.5;
+            
+            // Mic & Speaker pulse
+            if (nodesData.get('ac_mic')) {
+                updates.push({id: 'ac_mic', size: 15 + pulse * 8, color: {background: `rgba(239, 83, 80, ${0.3 + pulse * 0.3})`}});
+                updates.push({id: 'ac_spk', size: 15 + pulse * 5, color: {background: `rgba(239, 83, 80, ${0.3 + pulse * 0.2})`}});
+            }
+            
+            // Auditory Cortex glow based on frames
+            const acFrames = (ap.auditory_cortex?.frames_processed || 0);
+            const acGlow = Math.min(0.3 + (acFrames / 200), 1.0);
+            if (nodesData.get('ac_mel')) {
+                updates.push({id: 'ac_mel', size: 14 + acGlow * 8, color: {background: `rgba(0, 230, 118, ${acGlow})`}});
+                updates.push({id: 'ac_enc', size: 14 + acGlow * 6, color: {background: `rgba(0, 230, 118, ${acGlow * 0.9})`}});
+            }
+            
+            // VQ Codebook: intensity based on utilization
+            const vqUtil = ap.vq_codebook?.codebook_utilization || 0;
+            if (nodesData.get('ac_vq')) {
+                updates.push({id: 'ac_vq', size: 16 + vqUtil * 30, color: {background: `rgba(0, 230, 118, ${0.3 + vqUtil})`}});
+            }
+            
+            // Transformer layers: sequential pulse
+            for (let i = 0; i < 4; i++) {
+                const layerPulse = Math.sin((Date.now() / 400) + (i * 0.8)) * 0.3 + 0.5;
+                const seqs = ap.acoustic_brain?.total_sequences_heard || 0;
+                const tfGlow = Math.min(0.2 + (seqs / 50) + layerPulse * 0.3, 1.0);
+                if (nodesData.get(`ac_tf_${i}`)) {
+                    updates.push({id: `ac_tf_${i}`, size: 14 + tfGlow * 8, color: {background: `rgba(0, 230, 118, ${tfGlow})`}});
+                }
+            }
+            
+            // Vocoder: glow based on syntheses
+            const synths = ap.vocoder?.total_syntheses || 0;
+            const vocGlow = Math.min(0.2 + (synths / 20), 1.0);
+            if (nodesData.get('ac_recon')) {
+                updates.push({id: 'ac_recon', size: 12 + vocGlow * 8, color: {background: `rgba(124, 77, 255, ${vocGlow})`}});
+                updates.push({id: 'ac_gl', size: 12 + vocGlow * 6, color: {background: `rgba(124, 77, 255, ${vocGlow * 0.8})`}});
+            }
+        }
         
         if (nodesData.get('h_0')) {
              nodesData.update(updates);
@@ -476,10 +595,14 @@ function updateUI(state) {
         }
     }
 
-    // Emotions Radar Chart Update
+    // Emotions Radar Chart Update (with mood baseline)
     if (state.emotions && emotionChart) {
         emotionChart.data.datasets[0].data = state.emotions;
-        emotionChart.update('none'); // Update without full animation for performance
+        // Update mood baseline if available
+        if (state.mood_baseline) {
+            emotionChart.data.datasets[1].data = state.mood_baseline;
+        }
+        emotionChart.update('none');
     }
 
     // Drives Bar Chart Update
