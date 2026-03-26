@@ -98,11 +98,11 @@ Modern AI is built backwards. Companies spend billions to create a system that k
 
 ## Always-On Brain (10 Parallel Threads)
 
-Genesis is not turn-based. When you start it, **10 daemon threads** run simultaneously — just like a real brain:
+Genesis is not turn-based. When you start it, **11 daemon threads** run simultaneously — just like a real brain:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   BRAIN DAEMON (10 threads)                   │
+│                   BRAIN DAEMON (11 threads)                   │
 ├──────────────────┬──────────────────────────────────────────┤
 │ Neurochemistry   │ DA, cortisol, 5-HT, oxytocin tick       │
 │ (every 3s)       │ continuously — chemicals shift behavior  │
@@ -125,6 +125,9 @@ Genesis is not turn-based. When you start it, **10 daemon threads** run simultan
 │ Vision           │ Always-on camera — captures, embeds via  │
 │ (every 3s)       │ CLIP, processes through neural cascade    │
 ├──────────────────┼──────────────────────────────────────────┤
+│ Auditory         │ Always-on microphone — 3s chunking via   │
+│ (every 0.5s)     │ Whisper, feeds working memory & cascade  │
+├──────────────────┼──────────────────────────────────────────┤
 │ Emotions         │ 8-dim emotional state ticks: momentum,   │
 │ (every 2s)       │ blending, decay. Mood shifts over hours.  │
 ├──────────────────┼──────────────────────────────────────────┤
@@ -137,6 +140,8 @@ Genesis is not turn-based. When you start it, **10 daemon threads** run simultan
                     ↑
          CLI / API is just ONE input channel
          into this always-running brain
+
+> **⚡ Live Observe:** Genesis V5 automatically starts a **Web Dashboard** on `http://localhost:5000` so you can visually monitor all 11 threads, 8 drives, neurochemicals, working memory, and the 128-dim hidden state of the Personality GRU in real-time.
 ```
 
 The CLI is not the brain — it's a window into it. Genesis is thinking, feeling, and aging whether you type or not.

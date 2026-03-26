@@ -29,3 +29,5 @@ ollama>=0.1.0                  # Client for local LLM (phi3:mini or llama3.2:1b)
 # --- Utilities ---
 pyttsx3>=2.90                  # Text-to-speech (the AI's voice, offline)
 scipy>=1.11.0                  # Signal processing for audio
+flask==3.1.0
+flask-cors==5.0.0

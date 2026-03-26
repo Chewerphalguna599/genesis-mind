@@ -1183,4 +1183,13 @@ if __name__ == "__main__":
     if "--consciousness" in sys.argv:
         mind.run_consciousness()
     else:
+        # Start Web Dashboard
+        try:
+            from genesis.dashboard.server import DashboardServer
+            dashboard = DashboardServer(mind, port=5000)
+            dashboard.start()
+            print("\n  [Dashboard] Neural interface live at: http://localhost:5000\n")
+        except Exception as e:
+            print(f"\n  [Dashboard] Failed to start: {e}\n")
+
         mind.run_interactive()

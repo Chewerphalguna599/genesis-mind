@@ -1,0 +1,317 @@
+/* 
+  Genesis Mind V5 — Dashboard Aesthetics
+  Premium, dark mode, glassmorphic UI 
+*/
+
+:root {
+    --bg-base: #0a0a0c;
+    --glass-bg: rgba(20, 20, 25, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-main: #f0f0f5;
+    --text-muted: #8a8a93;
+    --accent: #4fc3f7;
+    --accent-glow: rgba(79, 195, 247, 0.4);
+    
+    --dopamine: #ffd54f;
+    --cortisol: #ef5350;
+    --serotonin: #4fc3f7;
+    --oxytocin: #ba68c8;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+}
+
+/* Background Animation */
+.background-anim {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: radial-gradient(circle at 50% 50%, rgba(30,30,40,1) 0%, rgba(10,10,12,1) 100%);
+    z-index: -1;
+}
+.background-anim::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%; width: 200%; height: 200%;
+    background: radial-gradient(circle at 50% 50%, rgba(79, 195, 247, 0.03) 0%, transparent 50%);
+    animation: rotate 60s linear infinite;
+}
+@keyframes rotate { 100% { transform: rotate(360deg); } }
+
+/* Header */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2.5rem;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(10, 10, 12, 0.8);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.pulse-ring {
+    width: 12px; height: 12px;
+    background-color: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 15px var(--accent-glow);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(79, 195, 247, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(79, 195, 247, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 195, 247, 0); }
+}
+
+h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+h1 span {
+    color: var(--accent);
+    font-weight: 700;
+}
+.badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.dot.live {
+    width: 8px; height: 8px;
+    background-color: #4caf50;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+/* Grid Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr 350px;
+    gap: 1.5rem;
+    padding: 2rem;
+    max-width: 1800px;
+    margin: 0 auto;
+}
+@media (max-width: 1200px) {
+    .dashboard-grid { grid-template-columns: 1fr 1fr; }
+    .right-col { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+}
+@media (max-width: 800px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .right-col { grid-template-columns: 1fr; }
+}
+
+.col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Glass Panels */
+.glass-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+h2 {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+.panel-header h2 { margin-bottom: 0; }
+
+.capacity-tag {
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.05);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+/* Threads Grid */
+.threads-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+.thread-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.thread-name { font-size: 0.8rem; font-weight: 500; text-transform: capitalize; }
+.thread-ticks { font-size: 0.7rem; color: var(--text-muted); }
+
+/* Working Memory */
+.wm-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.wm-slot {
+    background: rgba(255,255,255,0.03);
+    border-left: 3px solid var(--accent);
+    padding: 0.75rem;
+    border-radius: 0 4px 4px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.wm-concept { font-weight: 500; font-size: 0.9rem; }
+.wm-meta { display: flex; gap: 0.5rem; font-size: 0.7rem; color: var(--text-muted); }
+.wm-salience { color: var(--dopamine); }
+
+/* Charts */
+.large-chart {
+    flex: 1;
+    min-height: 400px;
+}
+.chart-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.drives-container { min-height: 250px; }
+
+/* Neurochemistry */
+.chemical-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.chemical {
+    display: grid;
+    grid-template-columns: 80px 1fr 40px;
+    align-items: center;
+    gap: 1rem;
+}
+.chem-name { font-size: 0.8rem; font-weight: 500; }
+.bar-bg {
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+.chem-val { font-size: 0.75rem; font-family: 'JetBrains Mono'; text-align: right; }
+
+#chem-dopamine { background: var(--dopamine); box-shadow: 0 0 8px var(--dopamine); }
+#chem-cortisol { background: var(--cortisol); box-shadow: 0 0 8px var(--cortisol); }
+#chem-serotonin { background: var(--serotonin); box-shadow: 0 0 8px var(--serotonin); }
+#chem-oxytocin { background: var(--oxytocin); box-shadow: 0 0 8px var(--oxytocin); }
+
+/* Neural Architecture */
+.neural-layer {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s;
+}
+.active-layer {
+    border-color: rgba(79, 195, 247, 0.3);
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.05) inset;
+}
+.layer-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+}
+.layer-stat {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+/* Hidden State Visualization */
+.activation-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+.hidden-state-viz {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 2px;
+    height: 32px;
+}
+.hs-cell {
+    background: rgba(255,255,255,0.05);
+    height: 100%;
+    border-radius: 1px;
+    transition: background-color 0.1s;
+}

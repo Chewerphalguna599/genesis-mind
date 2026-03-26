@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genesis Mind V5 — Neural Dashboard</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="background-anim"></div>
+    
+    <header class="app-header">
+        <div class="logo">
+            <div class="pulse-ring"></div>
+            <h1>Genesis Mind <span>V5</span></h1>
+            <span class="badge" id="phase-badge">Phase 1 (Infant)</span>
+        </div>
+        <div class="status-indicator">
+            <span class="dot live"></span>
+            <span id="connection-status">Live Consciousness Sync</span>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        
+        <!-- Left Column: Core Systems -->
+        <div class="col left-col">
+            
+            <!-- Brain Daemon Threads -->
+            <section class="glass-panel">
+                <h2><i class="icon">⚙️</i> Brain Daemon</h2>
+                <div class="threads-grid" id="threads-container">
+                    <!-- Javascript populates this -->
+                </div>
+            </section>
+            
+            <!-- Working Memory -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2><i class="icon">🧠</i> Working Memory</h2>
+                    <span class="capacity-tag"><span id="wm-usage">0</span> / <span id="wm-capacity">7</span> Slots</span>
+                </div>
+                <div class="wm-slots" id="wm-container">
+                    <!-- Javascript populates this -->
+                </div>
+            </section>
+            
+        </div>
+        
+        <!-- Middle Column: Dynamic Cognitive State -->
+        <div class="col middle-col">
+            
+            <!-- 8D Emotional State -->
+            <section class="glass-panel large-chart">
+                <h2><i class="icon">🌊</i> Emotional Dynamics</h2>
+                <div class="chart-container">
+                    <canvas id="emotionChart"></canvas>
+                </div>
+            </section>
+
+            <!-- 8 Maslow Drives -->
+            <section class="glass-panel large-chart">
+                <h2><i class="icon">🔥</i> Maslow Drive System</h2>
+                <div class="chart-container drives-container">
+                    <canvas id="drivesChart"></canvas>
+                </div>
+            </section>
+
+        </div>
+        
+        <!-- Right Column: Neural Architecture -->
+        <div class="col right-col">
+            
+            <!-- Neurochemistry -->
+            <section class="glass-panel neuro-panel">
+                <h2><i class="icon">🧪</i> Functional Neurochemistry</h2>
+                <div class="chemical-grid">
+                    <div class="chemical" data-color="#ffd54f">
+                        <span class="chem-name">Dopamine</span>
+                        <div class="bar-bg"><div class="bar-fill" id="chem-dopamine"></div></div>
+                        <span class="chem-val" id="val-dopamine">0.00</span>
+                    </div>
+                    <div class="chemical" data-color="#ef5350">
+                        <span class="chem-name">Cortisol</span>
+                        <div class="bar-bg"><div class="bar-fill" id="chem-cortisol"></div></div>
+                        <span class="chem-val" id="val-cortisol">0.00</span>
+                    </div>
+                    <div class="chemical" data-color="#4fc3f7">
+                        <span class="chem-name">Serotonin</span>
+                        <div class="bar-bg"><div class="bar-fill" id="chem-serotonin"></div></div>
+                        <span class="chem-val" id="val-serotonin">0.00</span>
+                    </div>
+                    <div class="chemical" data-color="#ba68c8">
+                        <span class="chem-name">Oxytocin</span>
+                        <div class="bar-bg"><div class="bar-fill" id="chem-oxytocin"></div></div>
+                        <span class="chem-val" id="val-oxytocin">0.00</span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Society of Mind (Neural Network) -->
+            <section class="glass-panel">
+                <div class="panel-header">
+                    <h2><i class="icon">⚡</i> The Plastic Mind</h2>
+                    <span class="capacity-tag" id="total-params">593K Params</span>
+                </div>
+                
+                <div class="neural-layer">
+                    <div class="layer-title">Layer 1: Limbic Instinct</div>
+                    <div class="layer-stat">Parameters: <span class="mono">59,620</span></div>
+                </div>
+                
+                <div class="neural-layer">
+                    <div class="layer-title">Layer 2: Binding Network</div>
+                    <div class="layer-stat">Parameters: <span class="mono">131,457</span></div>
+                    <div class="layer-stat">Semantic Concepts: <span class="mono" id="concept-count">0</span></div>
+                </div>
+                
+                <div class="neural-layer active-layer">
+                    <div class="layer-title">Layer 3: Personality GRU</div>
+                    <div class="layer-stat">Parameters: <span class="mono">311,296</span></div>
+                    <div class="layer-stat">Experiences: <span class="mono" id="exp-count">0</span></div>
+                    
+                    <!-- Real-time hidden state visualization -->
+                    <div class="activation-label">Hidden State Activation (128-dim)</div>
+                    <div class="hidden-state-viz" id="hidden-state-container">
+                        <!-- JS creates 128 micro-bars -->
+                    </div>
+                </div>
+                
+                <div class="neural-layer">
+                    <div class="layer-title">Layer 4: World Model</div>
+                    <div class="layer-stat">Parameters: <span class="mono">91,072</span></div>
+                    <div class="layer-stat">Surprise Loss: <span class="mono" id="surprise-loss">0.000</span></div>
+                </div>
+                
+            </section>
+            
+        </div>
+        
+    </main>
+
+    <!-- App Logic -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
