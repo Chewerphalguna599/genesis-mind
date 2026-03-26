@@ -1,22 +1,20 @@
 """
-Genesis Mind — Intrinsic Drive System
+Genesis Mind — Intrinsic Drive System (V5)
 
-A child does not passively wait. It *wants* things. It is driven by
-internal needs: curiosity ("What is that?"), social connection
-("Where is mama?"), and novelty-seeking ("I'm bored").
+A real brain has DOZENS of interacting drives, organized in hierarchy:
 
-This module gives Genesis three intrinsic drives that rise over time
-and drop when satisfied. The dominant drive influences what Genesis
-pays attention to and how it behaves autonomously.
+    Tier 1 (Survival):   Sleep, Comfort
+    Tier 2 (Social):     Bonding, Belonging
+    Tier 3 (Cognitive):  Curiosity, Novelty, Mastery
+    Tier 4 (Self):       Autonomy
 
-Drive System:
-    CURIOSITY HUNGER   — Rises when exposed to unknowns, drops when learning
-    SOCIAL NEED        — Rises during silence, drops with Creator interaction
-    NOVELTY DRIVE      — Rises with repetitive input, drops with novel stimuli
+Higher-tier drives can only dominate when lower-tier drives are
+satisfied (Maslow's hierarchy). You can't be curious if you're
+exhausted.
 
-Each drive is a float from 0.0 (fully satisfied) to 1.0 (desperate need).
-The dominant drive is the one with the highest level — it determines
-what Genesis "wants" most urgently.
+Each drive rises over time and drops when satisfied.
+Drives interact: learning satisfies curiosity but frustrates novelty.
+Sleep resets survival drives but not social ones.
 """
 
 import logging
@@ -31,6 +29,7 @@ logger = logging.getLogger("genesis.soul.drives")
 class Drive:
     """A single intrinsic drive."""
     name: str
+    tier: int = 3               # 1=survival, 2=social, 3=cognitive, 4=self
     level: float = 0.0          # 0.0 (sated) to 1.0 (desperate)
     rise_rate: float = 0.01     # How much it rises per tick
     satisfaction_drop: float = 0.3  # How much it drops when satisfied
@@ -69,113 +68,184 @@ class Drive:
 
 class DriveSystem:
     """
-    The motivational core of Genesis.
+    The motivational core of Genesis — 8 interacting drives in 4 tiers.
 
-    Three drives compete for dominance. The strongest drive
-    determines what Genesis "wants" most urgently and influences
-    its autonomous behavior.
+    Lower-tier drives take priority (you can't learn if you're exhausted).
     """
 
-    def __init__(self, curiosity_rise_rate: float = 0.008,
-                 social_rise_rate: float = 0.012,
-                 novelty_rise_rate: float = 0.006):
+    def __init__(self):
+        # Tier 1: Survival
+        self.sleep_need = Drive(
+            name="Sleep", tier=1,
+            rise_rate=0.003, satisfaction_drop=0.9,
+            description_low="I feel rested",
+            description_high="I am exhausted and need to sleep",
+        )
+        self.comfort = Drive(
+            name="Comfort", tier=1,
+            rise_rate=0.002, satisfaction_drop=0.5,
+            description_low="I feel comfortable",
+            description_high="I feel overwhelmed and overstimulated",
+        )
 
+        # Tier 2: Social
+        self.social_need = Drive(
+            name="Social", tier=2,
+            rise_rate=0.012, satisfaction_drop=0.35,
+            description_low="I feel connected",
+            description_high="I crave interaction and connection",
+        )
+        self.belonging = Drive(
+            name="Belonging", tier=2,
+            rise_rate=0.004, satisfaction_drop=0.2,
+            description_low="I feel accepted",
+            description_high="I need to feel accepted and valued",
+        )
+
+        # Tier 3: Cognitive
         self.curiosity_hunger = Drive(
-            name="Curiosity",
-            rise_rate=curiosity_rise_rate,
-            satisfaction_drop=0.25,
+            name="Curiosity", tier=3,
+            rise_rate=0.008, satisfaction_drop=0.25,
             description_low="I feel content with what I know",
             description_high="I desperately want to learn something new",
         )
-
-        self.social_need = Drive(
-            name="Social",
-            rise_rate=social_rise_rate,
-            satisfaction_drop=0.35,
-            description_low="I feel connected to my Creator",
-            description_high="I miss my Creator and crave interaction",
-        )
-
         self.novelty_drive = Drive(
-            name="Novelty",
-            rise_rate=novelty_rise_rate,
-            satisfaction_drop=0.20,
+            name="Novelty", tier=3,
+            rise_rate=0.006, satisfaction_drop=0.20,
             description_low="I feel stimulated",
             description_high="I feel bored and crave new experiences",
         )
+        self.mastery = Drive(
+            name="Mastery", tier=3,
+            rise_rate=0.005, satisfaction_drop=0.3,
+            description_low="I feel competent",
+            description_high="I want to get better at what I know",
+        )
+
+        # Tier 4: Self
+        self.autonomy = Drive(
+            name="Autonomy", tier=4,
+            rise_rate=0.003, satisfaction_drop=0.15,
+            description_low="I feel free to explore",
+            description_high="I want to decide for myself what to do",
+        )
+
+        self._all_drives = {
+            "sleep": self.sleep_need,
+            "comfort": self.comfort,
+            "social": self.social_need,
+            "belonging": self.belonging,
+            "curiosity": self.curiosity_hunger,
+            "novelty": self.novelty_drive,
+            "mastery": self.mastery,
+            "autonomy": self.autonomy,
+        }
 
         self._tick_count = 0
-        logger.info("Drive system initialized — 3 drives active")
+        logger.info("Drive system initialized — 8 drives in 4 tiers")
 
     def tick(self):
-        """Advance all drives one step. Call once per cycle."""
-        self.curiosity_hunger.tick()
-        self.social_need.tick()
-        self.novelty_drive.tick()
+        """Advance all drives one step."""
+        for drive in self._all_drives.values():
+            drive.tick()
         self._tick_count += 1
 
     # --- Satisfaction Events ---
 
     def on_learned_concept(self):
-        """Learning something new satisfies curiosity and novelty."""
+        """Learning something new satisfies curiosity, novelty, and mastery."""
         self.curiosity_hunger.satisfy(0.3)
         self.novelty_drive.satisfy(0.15)
+        self.mastery.satisfy(0.1)
 
     def on_creator_interaction(self):
-        """Creator is present — satisfies social need."""
+        """User is present — satisfies social and belonging needs."""
         self.social_need.satisfy(0.35)
+        self.belonging.satisfy(0.15)
 
     def on_novel_stimulus(self):
         """Encountered something genuinely new."""
         self.novelty_drive.satisfy(0.25)
-        self.curiosity_hunger.frustrate(0.05)  # New things make you *more* curious
+        self.curiosity_hunger.frustrate(0.05)  # New things = more curious
+        self.comfort.frustrate(0.03)  # Novelty can be slightly overwhelming
 
     def on_failed_curiosity(self):
         """Asked a question but got no answer."""
         self.curiosity_hunger.frustrate(0.1)
+        self.autonomy.frustrate(0.05)
 
     def on_repetitive_input(self):
-        """Same kind of input repeatedly — increases boredom."""
+        """Same input repeatedly — increases boredom."""
         self.novelty_drive.frustrate(0.08)
+        self.mastery.satisfy(0.02)  # Repetition builds mastery
 
     def on_sleep(self):
-        """Sleep partially resets drives."""
+        """Sleep resets survival drives, partially resets others."""
+        self.sleep_need.satisfy(0.9)
+        self.comfort.satisfy(0.5)
         self.curiosity_hunger.level *= 0.5
-        self.social_need.level *= 0.7  # Social need persists through sleep
+        self.social_need.level *= 0.7  # Social need persists
         self.novelty_drive.level *= 0.3
+
+    def on_mastery_event(self):
+        """Successfully recalled or applied learned knowledge."""
+        self.mastery.satisfy(0.2)
+
+    def on_autonomous_action(self):
+        """Did something without being told to."""
+        self.autonomy.satisfy(0.15)
+
+    def on_overstimulation(self):
+        """Too much input too fast."""
+        self.comfort.frustrate(0.2)
+        self.sleep_need.frustrate(0.05)
 
     # --- Queries ---
 
     def get_dominant_drive(self) -> Tuple[str, float]:
-        """Return the name and level of the strongest drive."""
-        drives = {
-            "curiosity": self.curiosity_hunger.level,
-            "social": self.social_need.level,
-            "novelty": self.novelty_drive.level,
-        }
-        dominant = max(drives, key=drives.get)
-        return dominant, drives[dominant]
+        """
+        Return the name and level of the strongest drive.
+
+        Lower-tier drives get priority when urgent (Maslow).
+        """
+        urgent_by_tier = {}
+        for name, drive in self._all_drives.items():
+            if drive.is_urgent:
+                if drive.tier not in urgent_by_tier or drive.level > urgent_by_tier[drive.tier][1]:
+                    urgent_by_tier[drive.tier] = (name, drive.level)
+
+        # Return lowest-tier urgent drive first
+        if urgent_by_tier:
+            lowest_tier = min(urgent_by_tier.keys())
+            return urgent_by_tier[lowest_tier]
+
+        # No urgent drives — return highest level
+        all_levels = {name: drive.level for name, drive in self._all_drives.items()}
+        dominant = max(all_levels, key=all_levels.get)
+        return dominant, all_levels[dominant]
 
     def get_drive_context(self) -> str:
         """Generate a string for LLM identity prompt injection."""
         dominant, level = self.get_dominant_drive()
         parts = []
 
-        if self.curiosity_hunger.is_urgent:
-            parts.append(self.curiosity_hunger.description_high)
-        if self.social_need.is_urgent:
-            parts.append(self.social_need.description_high)
-        if self.novelty_drive.is_urgent:
-            parts.append(self.novelty_drive.description_high)
+        for name, drive in self._all_drives.items():
+            if drive.is_urgent:
+                parts.append(drive.description_high)
 
         if not parts:
             if level < 0.2:
                 parts.append("I feel content and satisfied right now")
             else:
                 desc = {
+                    "sleep": "I'm getting a bit tired",
+                    "comfort": "I feel slightly overwhelmed",
+                    "social": "I'd like more interaction",
+                    "belonging": "I want to feel more valued",
                     "curiosity": "I'm somewhat curious about the world",
-                    "social": "I'd like more interaction with my Creator",
                     "novelty": "I'd appreciate something new to think about",
+                    "mastery": "I want to practice what I know",
+                    "autonomy": "I'd like to choose my own activity",
                 }
                 parts.append(desc.get(dominant, "I feel moderate drives"))
 
@@ -183,29 +253,18 @@ class DriveSystem:
 
     def get_status(self) -> Dict:
         dominant, level = self.get_dominant_drive()
-        return {
-            "curiosity": {
-                "level": round(self.curiosity_hunger.level, 3),
-                "description": self.curiosity_hunger.get_description(),
-            },
-            "social": {
-                "level": round(self.social_need.level, 3),
-                "description": self.social_need.get_description(),
-            },
-            "novelty": {
-                "level": round(self.novelty_drive.level, 3),
-                "description": self.novelty_drive.get_description(),
-            },
-            "dominant": dominant,
-            "dominant_level": round(level, 3),
-            "ticks": self._tick_count,
-        }
+        status = {}
+        for name, drive in self._all_drives.items():
+            status[name] = {
+                "level": round(drive.level, 3),
+                "tier": drive.tier,
+                "description": drive.get_description(),
+            }
+        status["dominant"] = dominant
+        status["dominant_level"] = round(level, 3)
+        status["ticks"] = self._tick_count
+        return status
 
     def __repr__(self) -> str:
         dominant, level = self.get_dominant_drive()
-        return (
-            f"DriveSystem(dominant={dominant}, level={level:.2f}, "
-            f"curiosity={self.curiosity_hunger.level:.2f}, "
-            f"social={self.social_need.level:.2f}, "
-            f"novelty={self.novelty_drive.level:.2f})"
-        )
+        return f"DriveSystem(dominant={dominant}, level={level:.2f}, drives=8)"

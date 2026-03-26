@@ -151,7 +151,7 @@ class CuriosityEngine:
             question = f"What that?" if not context else f"What is '{context}'?"
         elif phase == 3:
             # Child: proper questions
-            question = f"Creator, what is '{context}'? I haven't seen this before."
+            question = f"What is '{context}'? I haven't seen this before."
         elif phase == 4:
             # Adolescent: deeper curiosity
             question = f"I notice something unfamiliar: '{context}'. Can you explain what it is and why it matters?"

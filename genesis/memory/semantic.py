@@ -80,9 +80,29 @@ class Concept:
         self.times_correctly_recalled += 1
         self.strength = min(1.0, self.strength + 0.05)
 
-    def decay(self, amount: float = 0.005):
-        """Weaken this concept over time without reinforcement."""
-        self.strength = max(0.0, self.strength - amount)
+    def decay(self, dt_hours: float = 1.0):
+        """
+        Ebbinghaus forgetting curve: R = e^(-t/S)
+
+        S (stability) increases with:
+            - More encounters (rehearsal strengthens memory)
+            - Emotional charge (emotional memories last longer)
+            - Successful recalls (testing effect)
+
+        Memories are never truly deleted — they fade to near-zero
+        and become unretrievable, just like a real brain.
+        """
+        import math
+        # Stability: base + rehearsal bonus + recall bonus + emotional bonus
+        stability = (
+            1.0 +
+            self.times_encountered * 2.0 +
+            self.times_correctly_recalled * 3.0 +
+            (5.0 if self.emotional_valence != "neutral" else 0.0)
+        )
+        # Ebbinghaus decay: R = e^(-t/S)
+        retention = math.exp(-dt_hours / stability)
+        self.strength *= retention
 
     def to_dict(self) -> Dict:
         """Serialize to dict for storage."""
@@ -257,11 +277,8 @@ class SemanticMemory:
         """Return concepts that are barely learned (candidates for pruning)."""
         return [c for c in self._concepts.values() if c.strength <= max_strength]
 
-    def decay_all(self, amount: float = 0.005):
-        """Apply forgetting curve to all concepts."""
-        for concept in self._concepts.values():
-            concept.decay(amount)
-        self._save()
+
+
 
     def prune_dead_concepts(self, threshold: float = 0.01) -> int:
         """Remove concepts that have decayed below threshold."""
@@ -288,6 +305,26 @@ class SemanticMemory:
     def get_all_concepts(self) -> List[Concept]:
         """Return all concepts (for response decoder and introspection)."""
         return list(self._concepts.values())
+
+    def decay_all(self, dt_hours: float = 0.5):
+        """
+        Apply Ebbinghaus forgetting curve to ALL concepts.
+
+        Call this periodically (e.g. from brain daemon or sleep cycle).
+        Concepts below 0.01 strength become effectively forgotten —
+        they're still in storage but unretrievable, like a real brain.
+        """
+        for concept in self._concepts.values():
+            concept.decay(dt_hours)
+
+    def get_retrievable_concepts(self) -> List[Concept]:
+        """Get concepts strong enough to be recalled (strength >= 0.05)."""
+        return [c for c in self._concepts.values() if c.strength >= 0.05]
+
+    def get_fading_concepts(self, threshold: float = 0.2) -> List[Concept]:
+        """Get concepts that are fading and need rehearsal."""
+        return [c for c in self._concepts.values()
+                if 0.01 < c.strength < threshold]
 
     def spreading_activation(self, word: str, depth: int = 2,
                               decay: float = 0.6) -> List[Tuple[str, float]]:

@@ -154,10 +154,17 @@ BEHAVIORAL RULES:
         """
         memories = memories or []
 
+        # V5: Phase gate — NO LLM for young phases (0-2)
+        # A newborn/toddler cannot speak like an adult.
+        # Language must emerge from experience, not a pre-trained model.
+        if phase < 3:
+            logger.debug("Phase %d: LLM disabled — using developmental fallback", phase)
+            return self._fallback_think(sensory_input, question, phase)
+
         system_prompt = self._build_system_prompt(identity, moral_context, phase, phase_name)
         context_prompt = self._build_context_prompt(sensory_input, memories, recent_narrative, question)
 
-        # Try to use OLlama
+        # Try to use Ollama (only Phase 3+)
         client = self._get_client()
         if client is not None:
             try:

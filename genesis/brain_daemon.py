@@ -38,6 +38,8 @@ import threading
 import time
 from typing import Optional, Callable, Dict, Any
 
+import numpy as np
+
 logger = logging.getLogger("genesis.brain_daemon")
 
 
@@ -255,6 +257,27 @@ class BrainDaemon:
             name="vision",
             target=self._tick_vision,
             interval_sec=3.0,  # Look every 3 seconds
+        )
+
+        # Thread 8: Emotional State — continuous emotional dynamics
+        self._threads["emotions"] = BrainThread(
+            name="emotions",
+            target=self._tick_emotional_state,
+            interval_sec=2.0,  # Emotions tick every 2 seconds
+        )
+
+        # Thread 9: Memory Decay — Ebbinghaus forgetting curve
+        self._threads["memory_decay"] = BrainThread(
+            name="memory_decay",
+            target=self._tick_memory_decay,
+            interval_sec=60.0,  # Decay check every minute
+        )
+
+        # Thread 10: Play & Episodic Replay — creative exploration
+        self._threads["play"] = BrainThread(
+            name="play",
+            target=self._tick_play,
+            interval_sec=45.0,  # Play/replay every 45 seconds
         )
 
     # =========================================================================
@@ -491,6 +514,114 @@ class BrainDaemon:
         except Exception as e:
             # Camera might not be available — that's OK, we're just blind
             logger.debug("[vision] Camera not available: %s", e)
+
+    # =========================================================================
+    # Thread 8: Emotional State (Continuous Dynamics)
+    # =========================================================================
+
+    def _tick_emotional_state(self):
+        """
+        Tick the emotional system — emotions evolve continuously,
+        not just when something happens. Mood shifts slowly.
+        """
+        self.mind.emotional_state.tick()
+
+        # Enable Theory of Mind at Phase 3 (egocentric before that)
+        if (self._get_phase() >= 3 and
+                not self.mind.theory_of_mind.is_active):
+            self.mind.theory_of_mind.enable()
+
+        # Motor development tracks cognitive development
+        self.mind.motor.develop(self._get_phase())
+
+    # =========================================================================
+    # Thread 9: Memory Decay (Ebbinghaus Forgetting Curve)
+    # =========================================================================
+
+    def _tick_memory_decay(self):
+        """
+        Apply forgetting curve to all memories.
+
+        Memories that aren't rehearsed decay exponentially.
+        Fading memories trigger concern/rehearsal impulses.
+        """
+        # Apply decay (1 minute of simulated time per tick)
+        self.mind.semantic_memory.decay_all(dt_hours=0.017)  # ~1 min
+
+        # Check for fading memories and surface concern
+        fading = self.mind.semantic_memory.get_fading_concepts()
+        if fading and self._get_phase() >= 2:
+            weakest = fading[0]
+            if self._get_phase() >= 3:
+                self._emit(f"I'm starting to forget about '{weakest.word}'...", "💭")
+            else:
+                self._emit(self._phase_say("curiosity"), "💭")
+
+            # Auto-rehearse fading concepts (brain tries to hold on)
+            self.mind.working_memory.attend(
+                key=weakest.word,
+                content=weakest,
+                salience=0.4,
+                emotional_weight=0.1,
+            )
+
+    # =========================================================================
+    # Thread 10: Play & Episodic Replay
+    # =========================================================================
+
+    def _tick_play(self):
+        """
+        Spontaneous play behavior — combine concepts creatively,
+        rehearse memories, replay episodes.
+
+        Play is how children learn. It's not optional.
+        """
+        mind = self.mind
+        phase = self._get_phase()
+        concept_count = mind.semantic_memory.count()
+
+        if concept_count < 2:
+            return
+
+        # Should we play?
+        drive_status = mind.drives.get_status()
+        curiosity_level = drive_status.get("curiosity", {}).get("level", 0)
+        novelty_level = drive_status.get("novelty", {}).get("level", 0)
+
+        if mind.play.should_play(curiosity_level, novelty_level,
+                                  concept_count, phase):
+            # Combinatorial play: mix two concepts
+            all_concepts = [c.word for c in mind.semantic_memory.get_all_concepts()]
+
+            def get_emb(word):
+                c = mind.semantic_memory.recall(word)
+                if c and c.text_embedding:
+                    return np.array(c.text_embedding)
+                return None
+
+            result = mind.play.play_combine(
+                all_concepts, get_emb, mind.semantic_memory
+            )
+            if result and result["is_discovery"]:
+                a, b = result["concept_a"], result["concept_b"]
+                if phase >= 3:
+                    self._emit(
+                        f"Playing: '{a}' and '{b}' seem related (similarity: {result['similarity']:.2f})!",
+                        "🎮"
+                    )
+                else:
+                    self._emit(self._phase_say("wonder"), "🎮")
+                mind.drives.on_autonomous_action()
+                mind.emotional_state.on_experience(valence=0.2, arousal=0.1, novelty=0.3)
+
+        # Episodic replay: rehearse a memory
+        consolidation = mind.working_memory.get_consolidation_candidates()
+        for item in consolidation[:2]:
+            mind.working_memory.rehearse(item.key)
+            concept = mind.semantic_memory.recall(item.key)
+            if concept:
+                concept.reinforce(context="episodic_replay")
+                mind.metacognition.on_recall_attempt(item.key, success=True)
 
     # =========================================================================
     # Stats

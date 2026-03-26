@@ -46,6 +46,15 @@ from genesis.senses.proprioception import Proprioception
 from genesis.soul.drives import DriveSystem
 from genesis.brain_daemon import BrainDaemon
 
+# V5: Brain Realism Systems
+from genesis.memory.working_memory import WorkingMemory
+from genesis.cortex.attention import AttentionSystem
+from genesis.cortex.emotional_state import PersistentEmotionalState
+from genesis.cortex.theory_of_mind import TheoryOfMind
+from genesis.cortex.metacognition import Metacognition
+from genesis.cortex.play import PlayBehavior
+from genesis.senses.motor import SimulatedMotor
+
 logger = logging.getLogger("genesis.main")
 
 
@@ -131,12 +140,21 @@ class GenesisMind:
         self.proprioception = Proprioception()
         self.proprioception.increment_session()
 
-        # --- V4: Drive System (Intrinsic Motivation) ---
-        self.drives = DriveSystem(
-            curiosity_rise_rate=self.config.drives.curiosity_rise_rate,
-            social_rise_rate=self.config.drives.social_rise_rate,
-            novelty_rise_rate=self.config.drives.novelty_rise_rate,
-        )
+        # --- V4: Drive System (8 drives, 4 Maslow tiers) ---
+        self.drives = DriveSystem()
+
+        # --- V5: Brain Realism Systems ---
+        self.working_memory = WorkingMemory(capacity=7)
+        self.attention = AttentionSystem()
+        self.emotional_state = PersistentEmotionalState()
+        self.theory_of_mind = TheoryOfMind()
+        self.metacognition = Metacognition()
+        self.play = PlayBehavior()
+        self.motor = SimulatedMotor()
+
+        # Enable ToM at Phase 3+
+        if self.development.current_phase >= 3:
+            self.theory_of_mind.enable()
 
         # --- Initialize Consciousness ---
         self.consciousness = Consciousness(
@@ -181,6 +199,15 @@ class GenesisMind:
     def teach_concept(self, word: str, use_camera: bool = True) -> str:
         visual_embedding = None
 
+        # V5: Attention filter — is this worth processing deeply?
+        novelty = 1.0 if not self.semantic_memory.recall_concept(word) else 0.2
+        attention_result = self.attention.compute_salience(
+            stimulus_key=word,
+            novelty=novelty,
+            emotional_intensity=self.emotional_state.get_emotional_intensity(),
+            drive_states=self.drives.get_status(),
+        )
+
         if use_camera:
             try:
                 eyes = self._get_eyes()
@@ -199,8 +226,8 @@ class GenesisMind:
             clip_text_embedding_fn=self._get_eyes().embed_text if visual_embedding is not None else None,
         )
 
-        # Neurochemistry: learning rate modifier from emotional state
-        lr_mod = self.neurochemistry.get_learning_rate_modifier()
+        # Neurochemistry: learning rate modifier from chemical state
+        encoding_strength = self.neurochemistry.get_memory_encoding_strength()
 
         text_embedding = self.associations.embed_text(word).tolist()
         concept = self.semantic_memory.learn_concept(
@@ -208,13 +235,36 @@ class GenesisMind:
             visual_embedding=visual_embedding.tolist() if visual_embedding is not None else None,
             text_embedding=text_embedding,
             context=f"Taught by {self.axioms.creator_name}",
-            description=f"A concept taught directly by my creator",
+            description=f"A concept I was taught",
             emotional_valence="positive",
         )
 
-        # Apply neurochemical learning rate modifier to concept strength
+        # V5: Apply neurochemical encoding strength AND attention depth
         if hasattr(concept, 'strength'):
-            concept.strength = min(1.0, concept.strength * lr_mod)
+            depth_modifier = 1.0 if attention_result.processing_depth == "deep" else 0.6
+            concept.strength = min(1.0, concept.strength * encoding_strength * depth_modifier)
+
+        # V5: Working memory — attend to this concept
+        self.working_memory.attend(
+            key=word,
+            content=concept,
+            embedding=np.array(text_embedding) if text_embedding else None,
+            salience=attention_result.salience,
+            emotional_weight=self.emotional_state.get_emotional_intensity(),
+        )
+
+        # V5: Emotional response to learning
+        self.emotional_state.on_experience(
+            valence=0.3,  # Positive: being taught is pleasant
+            arousal=0.2,
+            novelty=novelty,
+        )
+
+        # V5: Metacognition — track this learning event
+        self.metacognition.on_learn(word, success=True)
+
+        # V5: Theory of Mind — observe what user is teaching
+        self.theory_of_mind.observe_interaction(word, topic=word, sentiment=0.3)
 
         self.hippocampus.store(
             collection="concepts",
@@ -226,19 +276,20 @@ class GenesisMind:
                 "phase": self.development.current_phase,
                 "has_visual": visual_embedding is not None,
                 "dopamine_level": round(self.neurochemistry.dopamine.level, 2),
+                "attention_depth": attention_result.processing_depth,
             },
-            document=f"Concept: {word}. Taught by creator.",
+            document=f"Concept: {word}. Learned through teaching.",
         )
 
         self.episodic_memory.record(
             event_type="teaching",
-            description=f"Creator taught me the concept '{word}'",
+            description=f"I was taught the concept '{word}'",
             auditory_text=word,
             spoken_words=[word],
             concepts_learned=[word],
             emotional_valence="positive",
             developmental_phase=self.development.current_phase,
-            importance=0.9 * lr_mod,
+            importance=0.9 * encoding_strength,
         )
 
         # Neurochemistry: reward for learning
@@ -339,9 +390,9 @@ class GenesisMind:
         response += f". I now know {self.semantic_memory.count()} concepts."
         if neural_voice and neural_voice not in ("(silence)", "(no words yet)"):
             response += f" My neural echo: '{neural_voice}'."
-        if lr_mod > 1.2:
+        if encoding_strength > 1.2:
             response += " I feel great joy learning this!"
-        elif lr_mod < 0.7:
+        elif encoding_strength < 0.7:
             response += " I feel uneasy, but I will remember."
         if milestone:
             response += f"\n\n🌟 {milestone}"
@@ -478,17 +529,20 @@ class GenesisMind:
 
         lines = [
             "╔══════════════════════════════════════════════════════╗",
-            "║         GENESIS MIND V4 — SOCIETY OF MIND + BODY       ║",
+            "║       GENESIS MIND V5 — BIOLOGICALLY REALISTIC        ║",
             "╚══════════════════════════════════════════════════════╝",
             "",
             f"  Name:           Genesis",
-            f"  Creator:        {model['identity']['creator']}",
+            f"  Guardian:       {model['identity']['creator']}",
             f"  Age:            {model['identity']['age']}",
             "",
             f"  Phase:          {model['development']['phase']} — {model['development']['phase_name']}",
+            f"  LLM:            {'ACTIVE' if model['development']['phase'] >= 3 else 'DORMANT (Phase 3+)'}",
             f"  Capabilities:   {', '.join(model['development']['capabilities'])}",
             "",
             f"  Concepts known: {model['knowledge']['concepts_known']}",
+            f"  Retrievable:    {len(self.semantic_memory.get_retrievable_concepts())}",
+            f"  Fading:         {len(self.semantic_memory.get_fading_concepts())}",
             f"  Memories:       {model['knowledge']['episodes_experienced']}",
             f"  Phonetics:      {model['knowledge']['phonetic_bindings']} bindings",
             f"  Grammar mode:   {self.grammar.mode}",
@@ -497,27 +551,99 @@ class GenesisMind:
             "  ── Body Sense (Proprioception) ──",
             f"  Time:           {body['time_of_day']} {body['day_of_week']}",
             f"  Uptime:         {body['uptime_hours']}h",
-            f"  Fatigue:        {'\u2588' * int(body['fatigue'] * 10):10} {body['fatigue']:.2f}",
+            f"  Fatigue:        {'█' * int(body['fatigue'] * 10):10} {body['fatigue']:.2f}",
             f"  Experiences:    {body['experience_count']}",
             "",
-            "  ── Drives (Motivation) ──",
-            f"  Curiosity:      {'\u2588' * int(drive_status['curiosity']['level'] * 10):10} {drive_status['curiosity']['level']:.2f}",
-            f"  Social:         {'\u2588' * int(drive_status['social']['level'] * 10):10} {drive_status['social']['level']:.2f}",
-            f"  Novelty:        {'\u2588' * int(drive_status['novelty']['level'] * 10):10} {drive_status['novelty']['level']:.2f}",
-            f"  Dominant:       {drive_status['dominant']} ({drive_status['dominant_level']:.2f})",
+            "  ── Working Memory (7±2 slots) ──",
+            f"  Buffer:         {self.working_memory.get_stats()['utilization']}",
+            f"  Total processed:{self.working_memory.get_stats()['total_processed']}",
+            f"  Forgotten:      {self.working_memory.get_stats()['forgotten']}",
+            "",
+            "  ── Drives (8 drives, 4 Maslow tiers) ──",
+        ]
+
+        # Show all 8 drives grouped by tier
+        tier_names = {1: "Survival", 2: "Social", 3: "Cognitive", 4: "Self"}
+        for tier in [1, 2, 3, 4]:
+            tier_drives = [(n, d) for n, d in drive_status.items()
+                           if isinstance(d, dict) and d.get('tier') == tier]
+            for name, info in tier_drives:
+                level = info['level']
+                bar = '█' * int(level * 10)
+                lines.append(f"  {name:14s} {bar:10} {level:.2f}")
+        lines.append(f"  Dominant:       {drive_status['dominant']} ({drive_status['dominant_level']:.2f})")
+
+        lines.extend([
+            "",
+            "  ── Emotional State (8 dimensions) ──",
+        ])
+        emo = self.emotional_state.get_status()
+        for dim, val in emo['dimensions'].items():
+            bar = '█' * int(abs(val) * 10)
+            sign = "+" if val >= 0 else "-"
+            lines.append(f"  {dim:14s} {sign}{bar:10} {val:+.3f}")
+        lines.append(f"  Dominant:       {emo['dominant']}")
+        lines.append(f"  Valence:        {emo['valence']:+.3f}  Arousal: {emo['arousal']:.3f}")
+
+        lines.extend([
             "",
             "  ── Neurochemistry ──",
-            f"  Dopamine:       {'\u2588' * int(neuro['dopamine']['level'] * 10):10} {neuro['dopamine']['level']:.2f} ({neuro['dopamine']['description']})",
-            f"  Cortisol:       {'\u2588' * int(neuro['cortisol']['level'] * 10):10} {neuro['cortisol']['level']:.2f} ({neuro['cortisol']['description']})",
-            f"  Serotonin:      {'\u2588' * int(neuro['serotonin']['level'] * 10):10} {neuro['serotonin']['level']:.2f} ({neuro['serotonin']['description']})",
-            f"  Oxytocin:       {'\u2588' * int(neuro['oxytocin']['level'] * 10):10} {neuro['oxytocin']['level']:.2f} ({neuro['oxytocin']['description']})",
-            f"  Learning rate:  {neuro['modifiers']['learning_rate']:.2f}x",
+            f"  Dopamine:       {'█' * int(neuro['dopamine']['level'] * 10):10} {neuro['dopamine']['level']:.2f} ({neuro['dopamine']['description']})",
+            f"  Cortisol:       {'█' * int(neuro['cortisol']['level'] * 10):10} {neuro['cortisol']['level']:.2f} ({neuro['cortisol']['description']})",
+            f"  Serotonin:      {'█' * int(neuro['serotonin']['level'] * 10):10} {neuro['serotonin']['level']:.2f} ({neuro['serotonin']['description']})",
+            f"  Oxytocin:       {'█' * int(neuro['oxytocin']['level'] * 10):10} {neuro['oxytocin']['level']:.2f} ({neuro['oxytocin']['description']})",
+            f"  Memory encoding:{neuro['modifiers']['learning_rate']:.2f}x",
             f"  Coherence:      {neuro['modifiers']['reasoning_coherence']:.2f}",
+            "",
+            "  ── Attention ──",
+        ])
+        att = self.attention.get_stats()
+        lines.extend([
+            f"  Stimuli:        {att['total_stimuli']}",
+            f"  Deep processed: {att['deep_processed']} ({att['deep_pct']})",
+            f"  Ignored:        {att['ignored']}",
+            f"  Unique tracked: {att['unique_stimuli_tracked']}",
             "",
             f"  ── Curiosity ──",
             f"  Questions asked: {curiosity_stats['total_questions_asked']}",
             f"  Stimuli seen:    {curiosity_stats['unique_stimuli_encountered']}",
-        ]
+        ])
+
+        # Metacognition
+        meta = self.metacognition.get_stats()
+        lines.extend([
+            "",
+            "  ── Metacognition (Self-Monitoring) ──",
+            f"  Concepts tracked: {meta['concepts_tracked']}",
+            f"  Avg confidence:   {meta['avg_confidence']:.0%}",
+            f"  Knowledge gaps:   {meta['knowledge_gaps']}",
+            f"  Strategy:         {meta['strategy']}",
+        ])
+
+        # Theory of Mind
+        tom = self.theory_of_mind.get_status()
+        lines.extend([
+            "",
+            "  ── Theory of Mind ──",
+            f"  Active:          {tom['active']}",
+        ])
+        if tom['active']:
+            lines.extend([
+                f"  User interactions: {tom['user_interactions']}",
+                f"  Topics taught:     {tom['topics_taught']}",
+                f"  User sentiment:    {tom['user_sentiment']}",
+                f"  User patience:     {tom['user_patience']}",
+            ])
+
+        # Play
+        play_stats = self.play.get_stats()
+        lines.extend([
+            "",
+            "  ── Play & Exploration ──",
+            f"  Play sessions:    {play_stats['play_sessions']}",
+            f"  Discoveries:      {play_stats['discoveries']}",
+            f"  Favorite:         {play_stats['favorite_concept'] or 'none yet'}",
+        ])
 
         # Unanswered questions
         unanswered = self.curiosity.get_unanswered()

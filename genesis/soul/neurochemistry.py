@@ -263,6 +263,38 @@ class Neurochemistry:
             return 0.4
         return 0.0
 
+    def get_attention_boost(self) -> float:
+        """
+        How focused/alert the attention system is.
+
+        High dopamine → sharpened attention toward rewarding stimuli
+        High cortisol → narrowed attention (tunnel vision)
+        Low serotonin → scattered attention
+
+        Returns: modifier for attention salience (0.5 to 2.0)
+        """
+        focus = 1.0
+        focus += (self.dopamine.level - 0.4) * 0.5   # Dopamine boosts
+        focus -= max(0, self.cortisol.level - 0.5) * 0.3  # Cortisol narrows
+        focus += (self.serotonin.level - 0.3) * 0.3  # Serotonin steadies
+        return max(0.5, min(2.0, focus))
+
+    def get_memory_encoding_strength(self) -> float:
+        """
+        How strongly new memories are encoded.
+
+        High dopamine → strong encoding
+        High cortisol → IMPAIRED encoding (real brain!)
+        High oxytocin → social memories encoded stronger
+
+        Returns: multiplier for memory strength (0.2 to 2.0)
+        """
+        strength = self.get_learning_rate_modifier()
+        # Cortisol ACTIVELY impairs hippocampal memory formation
+        if self.cortisol.level > 0.6:
+            strength *= 0.5
+        return strength
+
     # =========================================================================
     # Tick / Status
     # =========================================================================
@@ -316,7 +348,7 @@ class Neurochemistry:
         if self.serotonin.is_high():
             parts.append("I feel stable and centered")
         if self.oxytocin.is_high():
-            parts.append("I feel a deep bond with my Creator")
+            parts.append("I feel a deep bond with those around me")
         if self.cortisol.is_low() and self.dopamine.level > 0.4:
             parts.append("I feel calm and safe")
 
