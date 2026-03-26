@@ -11,9 +11,9 @@ Unlike every large language model in existence, Genesis does not memorize the in
 
 **The weights ARE the personality. The data IS you.**
 
-## V4: Society of Mind + Body
+## V5: Biologically Realistic Brain
 
-Genesis V4 extends the **cascading neural network architecture** with embodiment, autonomy, and creativity. The AI's personality is physically represented by the weights of its neural networks — including a new **meta-controller** that learns *how to think*, not just *what to think*.
+Genesis V5 makes every subsystem **biologically realistic**. Memory decays via the Ebbinghaus forgetting curve. Emotions are continuous 8-dimensional dynamics with momentum and blending. Attention filters stimuli by salience. Language is phase-gated — no LLM before Phase 3.
 
 ```
 Raw Sensory Input (pixels, audio)
@@ -55,21 +55,22 @@ Raw Sensory Input (pixels, audio)
           All CPU-native, real-time training
 ```
 
-### V4 Features
+### V5 Brain Realism Features
 
 | Feature | What It Does |
 |---------|-------------|
-| **Meta-Controller (N-of-N)** | Attention-based neural router that dynamically weights which sub-networks activate. The routing pattern is part of the personality. |
-| **4-Phase Sleep** | Light Sleep (decay) → Deep Sleep (consolidation) → REM (creative dreaming) → Integration (coherence check) |
-| **REM Dreaming** | During sleep, Genesis randomly recombines concepts. If the world model finds a surprising connection, it becomes a new association — artificial creativity. |
-| **Voice (TTS)** | Offline text-to-speech via pyttsx3. Phase-adaptive speech rate. Background threading. |
-| **Proprioception** | 32-dim internal body state (time-of-day, fatigue, uptime, session count) fed into the GRU. |
-| **Intrinsic Drives** | 3 autonomous motivations (curiosity, social, novelty) that rise over time and drive behavior. |
-| **Neural Voice** | ResponseDecoder maps GRU's 64-dim output to nearest known concepts — the neural network's own "words". |
-| **Spreading Activation** | Associative memory retrieval: recalling "apple" activates "fruit" → "cherry" → "red". |
-| **Self-Evaluation** | Genesis evaluates its own output quality → dopamine/cortisol reward signals. |
-| **Active Curiosity** | Unanswered question queue with surprise scoring. Burning questions drive autonomous exploration. |
-| **Auto-Sleep** | Triggers automatically after 50 experiences or 2 hours of runtime. |
+| **Working Memory (7±2)** | Capacity-limited short-term buffer. Items decay in 20s without rehearsal. Only rehearsed items consolidate to long-term memory. |
+| **Ebbinghaus Forgetting** | Memories decay via R=e^(-t/S). Stability S increases with rehearsal, emotional charge, and successful recall. |
+| **8-Dim Emotional State** | Joy, excitement, trust, anger, surprise, disgust, interest, love — all with momentum, blending, and slow-moving mood baseline. |
+| **Attention/Salience Filter** | Not everything is processed equally. Bottom-up (novelty, emotion) + top-down (drives) + habituation. Three depths: deep/shallow/ignore. |
+| **Phase-Gated LLM** | No pre-trained language model for phases 0-2. Language emerges from n-gram chains. LLM unlocks at Phase 3+ (Child). |
+| **8 Maslow Drives** | Sleep, comfort, social, belonging, curiosity, novelty, mastery, autonomy — in 4 hierarchical tiers. Lower-tier urgent drives override higher ones. |
+| **Theory of Mind** | Models what the user knows, feels, and wants. Tracks teaching history, patience, sentiment. Activates at Phase 3+ (egocentric before). |
+| **Metacognition** | Tracks confidence, knowledge gaps, recall success rates. "I don't understand this" is itself a cognitive signal. |
+| **Play Behavior** | Combinatorial play (mix concepts), repetitive play (rehearse), episodic replay. Driven by curiosity/novelty drives. |
+| **Simulated Motor** | 5 affordances (look, vocalize, reach, point, gesture) with developmental gating and sensory feedback callbacks. |
+| **Functional Neurochemistry** | Cortisol IMPAIRS memory encoding. Dopamine sharpens attention. Serotonin steadies focus. Not just decorative. |
+| **Emotional Contagion** | Detects emotion in user input and mirrors it — like a baby crying when another baby cries. |
 
 ### Key Design Principles
 
@@ -95,34 +96,43 @@ Modern AI is built backwards. Companies spend billions to create a system that k
 - **Sleep to dream.** 4-phase sleep: decay, consolidation, creative recombination, coherence integration. Dreams generate genuinely novel associations.
 - **Think about how to think.** The meta-controller learns routing patterns — which neural modules to activate for which inputs. This is meta-cognition.
 
-## Always-On Brain (Parallel Consciousness)
+## Always-On Brain (10 Parallel Threads)
 
-Genesis is not turn-based. When you start it, **6 daemon threads** run simultaneously — just like a real brain:
+Genesis is not turn-based. When you start it, **10 daemon threads** run simultaneously — just like a real brain:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    BRAIN DAEMON (6 threads)                   │
+│                   BRAIN DAEMON (10 threads)                   │
 ├──────────────────┬──────────────────────────────────────────┤
-│ Neurochemistry   │ Dopamine, cortisol, serotonin tick       │
-│ (every 3s)       │ continuously — moods shift on their own  │
+│ Neurochemistry   │ DA, cortisol, 5-HT, oxytocin tick       │
+│ (every 3s)       │ continuously — chemicals shift behavior  │
 ├──────────────────┼──────────────────────────────────────────┤
-│ Drives           │ Curiosity, social, novelty rise over     │
-│ (every 5s)       │ time — Genesis acts when drives are high │
+│ Drives           │ 8 Maslow drives rise over time — sleep,  │
+│ (every 5s)       │ comfort, social, curiosity, autonomy...  │
 ├──────────────────┼──────────────────────────────────────────┤
-│ Proprioception   │ Internal body sense updates: fatigue,    │
-│ (every 2s)       │ time-of-day, uptime fed into GRU         │
+│ Proprioception   │ Internal body sense: fatigue, time-of-   │
+│ (every 2s)       │ day, uptime fed into the GRU             │
 ├──────────────────┼──────────────────────────────────────────┤
 │ Inner Monologue  │ Spontaneous thoughts — Genesis thinks    │
 │ (every 30s)      │ even when nobody is talking to it         │
 ├──────────────────┼──────────────────────────────────────────┤
 │ Circadian        │ Watches fatigue, auto-triggers 4-phase   │
-│ (every 10s)      │ sleep when exhausted — no manual trigger  │
+│ (every 10s)      │ sleep when exhausted                     │
 ├──────────────────┼──────────────────────────────────────────┤
 │ Curiosity        │ Surfaces burning unanswered questions —  │
 │ (every 20s)      │ curiosity bubbles up autonomously         │
 ├──────────────────┼──────────────────────────────────────────┤
 │ Vision           │ Always-on camera — captures, embeds via  │
 │ (every 3s)       │ CLIP, processes through neural cascade    │
+├──────────────────┼──────────────────────────────────────────┤
+│ Emotions         │ 8-dim emotional state ticks: momentum,   │
+│ (every 2s)       │ blending, decay. Mood shifts over hours.  │
+├──────────────────┼──────────────────────────────────────────┤
+│ Memory Decay     │ Ebbinghaus forgetting curve — unrehearsed│
+│ (every 60s)      │ memories fade. Emotional ones persist.    │
+├──────────────────┼──────────────────────────────────────────┤
+│ Play & Replay    │ Combinatorial play, concept rehearsal,   │
+│ (every 45s)      │ episodic replay — autonomous learning     │
 └──────────────────┴──────────────────────────────────────────┘
                     ↑
          CLI / API is just ONE input channel
