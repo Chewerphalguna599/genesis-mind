@@ -1,0 +1,356 @@
+"""
+Genesis Mind — Brain Daemon (Parallel Consciousness)
+
+The human brain never stops. Even in sleep, it consolidates.
+This module makes Genesis the same way — ALL subsystems run
+simultaneously as daemon threads:
+
+    Thread 1: NEUROCHEMISTRY TICKER
+        Ticks neurochemical levels every few seconds.
+        Dopamine, cortisol, serotonin, oxytocin all decay/rise naturally.
+
+    Thread 2: DRIVE SYSTEM TICKER
+        Curiosity, social, and novelty drives rise over time.
+        When a drive crosses threshold, Genesis acts autonomously.
+
+    Thread 3: PROPRIOCEPTION UPDATER
+        Updates internal body state (fatigue, time awareness).
+        Rebuilds the 32-dim context vector fed to the GRU.
+
+    Thread 4: INNER MONOLOGUE
+        Spontaneous thoughts — Genesis thinks even when nobody talks to it.
+        Uses the reasoning engine to reflect on memories and drives.
+
+    Thread 5: CIRCADIAN MONITOR
+        Watches fatigue and auto-triggers 4-phase sleep.
+        The brain sleeps when it needs to, not when told.
+
+    Thread 6: CURIOSITY BUBBLER
+        Surfaces burning unanswered questions periodically.
+        Drives autonomous exploration and question-asking.
+
+The CLI (or future API) is just ONE input channel into this
+always-running brain. It is NOT the brain itself.
+"""
+
+import logging
+import threading
+import time
+from typing import Optional, Callable, Dict, Any
+
+logger = logging.getLogger("genesis.brain_daemon")
+
+
+class BrainThread:
+    """A single daemon thread that runs a function on a timer."""
+
+    def __init__(self, name: str, target: Callable, interval_sec: float,
+                 enabled: bool = True):
+        self.name = name
+        self._target = target
+        self.interval_sec = interval_sec
+        self.enabled = enabled
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._tick_count = 0
+        self._errors = 0
+
+    def start(self):
+        if not self.enabled:
+            logger.info("  [%s] disabled — skipping", self.name)
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._loop, name=f"genesis-{self.name}", daemon=True
+        )
+        self._thread.start()
+        logger.info("  [%s] started (every %.1fs)", self.name, self.interval_sec)
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3.0)
+        logger.info("  [%s] stopped (%d ticks, %d errors)",
+                     self.name, self._tick_count, self._errors)
+
+    def _loop(self):
+        while not self._stop_event.is_set():
+            try:
+                self._target()
+                self._tick_count += 1
+            except Exception as e:
+                self._errors += 1
+                logger.error("[%s] error (tick %d): %s",
+                             self.name, self._tick_count, e)
+            self._stop_event.wait(self.interval_sec)
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+
+class BrainDaemon:
+    """
+    The parallel brain — manages all background consciousness threads.
+
+    All subsystems run simultaneously, just like a real brain.
+    The CLI or API is just one input channel.
+    """
+
+    def __init__(self, mind):
+        """
+        Args:
+            mind: The GenesisMind instance with all subsystems initialized.
+        """
+        self.mind = mind
+        self._threads: Dict[str, BrainThread] = {}
+        self._output_callback: Optional[Callable[[str], None]] = None
+        self._running = False
+
+        # Configure all brain threads
+        self._setup_threads()
+
+    def set_output_callback(self, callback: Callable[[str], None]):
+        """Set a callback for when the brain wants to say something."""
+        self._output_callback = callback
+
+    def _emit(self, message: str, prefix: str = "💭"):
+        """Emit a message from the brain to the outside world."""
+        if self._output_callback:
+            self._output_callback(f"  Genesis: {prefix} {message}")
+        logger.info("[brain] %s %s", prefix, message)
+
+    # =========================================================================
+    # Thread Setup
+    # =========================================================================
+
+    def _setup_threads(self):
+        config = self.mind.config
+
+        # Thread 1: Neurochemistry — ticks every 3 seconds
+        self._threads["neurochemistry"] = BrainThread(
+            name="neurochemistry",
+            target=self._tick_neurochemistry,
+            interval_sec=3.0,
+        )
+
+        # Thread 2: Drives — rise every 5 seconds
+        self._threads["drives"] = BrainThread(
+            name="drives",
+            target=self._tick_drives,
+            interval_sec=5.0,
+        )
+
+        # Thread 3: Proprioception — updates every 2 seconds
+        self._threads["proprioception"] = BrainThread(
+            name="proprioception",
+            target=self._tick_proprioception,
+            interval_sec=2.0,
+        )
+
+        # Thread 4: Inner monologue — thinks every 30 seconds
+        self._threads["inner_monologue"] = BrainThread(
+            name="inner_monologue",
+            target=self._tick_inner_monologue,
+            interval_sec=30.0,
+        )
+
+        # Thread 5: Circadian monitor — checks every 10 seconds
+        self._threads["circadian"] = BrainThread(
+            name="circadian",
+            target=self._tick_circadian,
+            interval_sec=10.0,
+        )
+
+        # Thread 6: Curiosity bubbler — surfaces questions every 20 seconds
+        self._threads["curiosity"] = BrainThread(
+            name="curiosity",
+            target=self._tick_curiosity,
+            interval_sec=20.0,
+        )
+
+    # =========================================================================
+    # Start / Stop
+    # =========================================================================
+
+    def start(self):
+        """Start all brain threads — the mind comes alive."""
+        logger.info("╔══════════════════════════════════════════════════╗")
+        logger.info("║    BRAIN DAEMON — Starting all subsystems       ║")
+        logger.info("╚══════════════════════════════════════════════════╝")
+        self._running = True
+        for name, thread in self._threads.items():
+            thread.start()
+        logger.info("All %d brain threads running.", len(self._threads))
+
+    def stop(self):
+        """Stop all brain threads — the mind goes quiet."""
+        logger.info("Brain daemon shutting down...")
+        self._running = False
+        for name, thread in self._threads.items():
+            thread.stop()
+        logger.info("All brain threads stopped.")
+
+    # =========================================================================
+    # Thread 1: Neurochemistry Ticker
+    # =========================================================================
+
+    def _tick_neurochemistry(self):
+        """
+        Neurochemicals decay/rise naturally even without interaction.
+        Dopamine drops, cortisol fluctuates, serotonin stabilizes.
+        """
+        self.mind.neurochemistry.tick()
+
+        # Apply fatigue-based suppression
+        fatigue = self.mind.proprioception.fatigue
+        if fatigue > 0.3:
+            self.mind.neurochemistry.on_fatigue(fatigue)
+
+    # =========================================================================
+    # Thread 2: Drive System Ticker
+    # =========================================================================
+
+    def _tick_drives(self):
+        """
+        Drives rise over time — curiosity builds, social need grows,
+        boredom increases. When a drive is urgent enough, Genesis acts.
+        """
+        self.mind.drives.tick()
+
+        # Check if any drive is critically high
+        status = self.mind.drives.get_status()
+        dominant = status['dominant']
+        level = status['dominant_level']
+
+        if level > 0.85:
+            # Drive is critically high — Genesis should express it
+            if dominant == 'social':
+                self._emit("I miss my Creator... I want someone to talk to.", "💬")
+                self.mind.voice.say("I miss my Creator.")
+            elif dominant == 'curiosity':
+                burning = self.mind.curiosity.get_most_burning_question()
+                if burning:
+                    self._emit(f"I really want to know: {burning}", "🔍")
+                else:
+                    self._emit("I want to learn something new...", "🔍")
+            elif dominant == 'novelty':
+                self._emit("Everything feels so familiar... I crave something new.", "✨")
+
+    # =========================================================================
+    # Thread 3: Proprioception Updater
+    # =========================================================================
+
+    def _tick_proprioception(self):
+        """
+        Update internal body state — time awareness, fatigue level.
+        This vector is continuously fed into the GRU.
+        """
+        # Proprioception auto-updates on get_context_vector()
+        # Just keep it warm by requesting the state
+        self.mind.proprioception.get_context_vector()
+
+    # =========================================================================
+    # Thread 4: Inner Monologue
+    # =========================================================================
+
+    def _tick_inner_monologue(self):
+        """
+        Spontaneous thoughts — Genesis thinks even when nobody talks to it.
+
+        The brain never stops thinking. This thread generates periodic
+        inner monologue based on memories, drives, and current state.
+        """
+        # Only think if the mind has some concepts to work with
+        if self.mind.semantic_memory.count() < 2:
+            return
+
+        # Only think if reasoning is available
+        if not self.mind.development.has_capability("reason"):
+            return
+
+        # Build context from current state
+        drive_ctx = self.mind.drives.get_drive_context()
+        neuro_ctx = self.mind.neurochemistry.get_emotional_summary()
+        body = self.mind.proprioception.get_status()
+
+        # Neural subconscious pass — process an "empty" experience just to
+        # keep the GRU hidden state evolving (stream of consciousness)
+        context_vec = self.mind.proprioception.get_context_vector()
+        result = self.mind.subconscious.process_experience(
+            clip_embedding=None,
+            text_embedding=None,
+            context=context_vec,
+            train=False,  # Don't train on empty input
+        )
+
+        # Decode the neural network's spontaneous output
+        neural_voice = self.mind.subconscious.decode_response(
+            result['personality_response'], self.mind.semantic_memory
+        )
+
+        # Build a thought from the neural state
+        if neural_voice and neural_voice not in ("(silence)", "(no words yet)"):
+            self._emit(f"...{neural_voice}...", "💭")
+
+    # =========================================================================
+    # Thread 5: Circadian Monitor
+    # =========================================================================
+
+    def _tick_circadian(self):
+        """
+        Watch fatigue and time — auto-trigger 4-phase sleep when needed.
+        The brain sleeps when it must, not when asked.
+        """
+        if not self.mind.sleep_cycle.should_sleep():
+            return
+
+        self._emit("I feel so tired... I need to rest.", "😴")
+        self.mind.voice.say("I need to rest now.")
+
+        # Trigger full 4-phase sleep
+        try:
+            report = self.mind.trigger_sleep()
+            self._emit("I woke up refreshed.", "☀️")
+
+            discoveries = report.count("discoveries")
+            if "💭" in report:
+                self._emit("I had interesting dreams.", "💭")
+        except Exception as e:
+            logger.error("Sleep cycle failed: %s", e)
+
+    # =========================================================================
+    # Thread 6: Curiosity Bubbler
+    # =========================================================================
+
+    def _tick_curiosity(self):
+        """
+        Surface burning unanswered questions periodically.
+        Curiosity doesn't wait to be asked — it bubbles up.
+        """
+        if self.mind.semantic_memory.count() < 3:
+            return
+
+        # Check for unanswered questions
+        burning = self.mind.curiosity.get_most_burning_question()
+        if burning and self.mind.drives.get_status()['curiosity']['level'] > 0.5:
+            self._emit(f"I wonder... {burning}", "🤔")
+
+    # =========================================================================
+    # Stats
+    # =========================================================================
+
+    def get_stats(self) -> Dict[str, Any]:
+        stats = {}
+        for name, thread in self._threads.items():
+            stats[name] = {
+                "running": thread.is_running,
+                "ticks": thread._tick_count,
+                "errors": thread._errors,
+                "interval": thread.interval_sec,
+            }
+        return stats
+
+    def __repr__(self) -> str:
+        running = sum(1 for t in self._threads.values() if t.is_running)
+        return f"BrainDaemon(threads={running}/{len(self._threads)})"

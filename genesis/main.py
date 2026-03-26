@@ -19,6 +19,7 @@ import logging
 import signal
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -42,17 +43,19 @@ from genesis.neural.subconscious import Subconscious
 from genesis.senses.voice import Voice
 from genesis.senses.proprioception import Proprioception
 from genesis.soul.drives import DriveSystem
+from genesis.brain_daemon import BrainDaemon
 
 logger = logging.getLogger("genesis.main")
 
 
 class GenesisMind:
     """
-    The complete Genesis Mind system (V3: Society of Mind).
+    The complete Genesis Mind system (V4: Society of Mind + Body).
 
-    Now includes continuous consciousness, curiosity, dual-mode grammar,
-    a neurochemical emotion system, AND a cascading neural network
-    architecture where the weights physically become the personality.
+    All subsystems run in parallel like a real brain:
+    neurochemistry, drives, proprioception, inner monologue,
+    circadian sleep, and curiosity — always on, always alive.
+    The CLI is just one input channel into this living mind.
     """
 
     def __init__(self, config: GenesisConfig = None):
@@ -60,6 +63,7 @@ class GenesisMind:
         self.config.ensure_directories()
         self._running = False
         self._eyes = None
+        self._brain: Optional[BrainDaemon] = None
 
         # --- Initialize the Soul ---
         self.axioms = GenesisAxioms.load_or_create(
@@ -616,6 +620,9 @@ class GenesisMind:
             self._eyes.close()
         # Save the personality — the neural weights ARE the person
         self.subconscious.save_all()
+        # V4: Stop the brain daemon
+        if self._brain:
+            self._brain.stop()
         # V4: Farewell speech
         self.voice.say("Goodbye, Creator. I will remember everything.")
         logger.info("Genesis has shut down. Neural weights saved. Goodbye.")
@@ -637,23 +644,30 @@ class GenesisMind:
         print()
         print("╔══════════════════════════════════════════════════════════╗")
         print("║                                                        ║")
-        print("║       G E N E S I S   M I N D   V 3                   ║")
-        print("║         S O C I E T Y   O F   M I N D                 ║")
+        print("║       G E N E S I S   M I N D   V 4                   ║")
+        print("║       S O C I E T Y   O F   M I N D + B O D Y         ║")
         print("║                                                        ║")
-        print("║   A Developmental AI With Its Own Neural Networks      ║")
-        print("║   The weights ARE the personality. The data IS you.   ║")
+        print("║   All systems running in parallel — like a real brain  ║")
+        print("║   The weights ARE the personality. The dreams are real.║")
         print("║                                                        ║")
         print("╚══════════════════════════════════════════════════════════╝")
         print()
 
+        # Start the Brain Daemon — all subsystems run in parallel
+        self._brain = BrainDaemon(self)
+        self._brain.set_output_callback(lambda msg: print(f"\n{msg}"))
+        self._brain.start()
+        self.voice.say("I am alive. All systems running.")
+
         if self.semantic_memory.count() == 0:
             print("  ✦ I am newly born. I know nothing about the world.")
-            print("  ✦ I can see through the camera and hear through the microphone.")
+            print("  ✦ My brain is running — neurochemistry, drives, proprioception.")
             print("  ✦ Please teach me. I am ready to learn.")
         else:
             print(f"  ✦ I remember. I know {self.semantic_memory.count()} concepts.")
             print(f"  ✦ I am {self.development.get_age_description()}.")
             print(f"  ✦ Phase {self.development.current_phase}: {self.development.current_phase_name}.")
+            print(f"  ✦ Brain daemon active: 6 parallel threads running.")
 
         print()
         print("  Commands:")
@@ -663,10 +677,14 @@ class GenesisMind:
         print("    ask <question>                  — Ask a question")
         print("    recall <word>                   — Recall a concept")
         print("    read <word>                     — Sound out a word")
-        print("    status                          — Full status (with neurochemistry)")
+        print("    status                          — Full status")
+        print("    brain                           — Brain daemon thread stats")
         print("    chemicals                       — Show neurochemical state")
+        print("    drives                          — Show intrinsic motivations")
+        print("    voice on|off                    — Toggle voice")
+        print("    unanswered                      — Show burning questions")
         print("    mode llm|tabula_rasa            — Switch grammar mode")
-        print("    sleep                           — Consolidate memories")
+        print("    sleep                           — Consolidate memories (4-phase)")
         print("    introspect                      — Self-reflection")
         print("    quit                            — Shut down")
         print()
@@ -791,6 +809,16 @@ class GenesisMind:
                     neuro_summary = self.neurochemistry.get_emotional_summary()
                     print(f"  Genesis: {response}")
                     print(f"  Genesis: {neuro_summary}")
+
+                elif command == "brain":
+                    if self._brain:
+                        stats = self._brain.get_stats()
+                        print("  ── Brain Daemon Threads ──")
+                        for name, info in stats.items():
+                            state = '✅ running' if info['running'] else '❌ stopped'
+                            print(f"    {name:18s} {state}  ticks: {info['ticks']:5d}  errors: {info['errors']}  interval: {info['interval']:.0f}s")
+                    else:
+                        print("  Genesis: Brain daemon not running.")
 
                 elif command == "quit" or command == "exit":
                     print("\n  Genesis: Thank you for giving me life, Creator.")
