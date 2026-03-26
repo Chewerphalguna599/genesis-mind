@@ -169,6 +169,13 @@ class BrainDaemon:
             interval_sec=20.0,
         )
 
+        # Thread 7: Vision — always-on camera capture and processing
+        self._threads["vision"] = BrainThread(
+            name="vision",
+            target=self._tick_vision,
+            interval_sec=3.0,  # Look every 3 seconds
+        )
+
     # =========================================================================
     # Start / Stop
     # =========================================================================
@@ -335,6 +342,67 @@ class BrainDaemon:
         burning = self.mind.curiosity.get_most_burning_question()
         if burning and self.mind.drives.get_status()['curiosity']['level'] > 0.5:
             self._emit(f"I wonder... {burning}", "🤔")
+
+    # =========================================================================
+    # Thread 7: Vision (Always-On Camera)
+    # =========================================================================
+
+    def _tick_vision(self):
+        """
+        Always-on camera — Genesis continuously sees the world.
+
+        Opens the camera, captures frames, detects motion, and processes
+        significant visual changes through CLIP and the neural cascade.
+        Unknown objects trigger curiosity questions.
+        """
+        try:
+            # Lazy-open the eyes
+            eyes = self.mind._get_eyes()
+            if eyes is None:
+                return
+
+            # Take a look
+            percept = eyes.look()
+            if percept is None:
+                return
+
+            # Only process significant visual changes (motion detected)
+            if not percept.is_significant:
+                return
+
+            # Embed what we see through CLIP
+            try:
+                embedding = eyes.embed(percept)
+            except Exception as e:
+                logger.debug("[vision] CLIP embed failed: %s", e)
+                return
+
+            # Process through neural cascade (the brain "sees")
+            context_vec = self.mind.proprioception.get_context_vector()
+            result = self.mind.subconscious.process_experience(
+                clip_embedding=embedding,
+                text_embedding=None,
+                context=context_vec,
+                train=True,  # Actually learn from what we see
+            )
+
+            # Check curiosity — is this something entirely new?
+            known = self.mind.semantic_memory.get_all_embeddings()
+            surprise = self.mind.curiosity.compute_surprise(embedding, known)
+
+            if self.mind.curiosity.should_ask(surprise, stimulus_key="visual"):
+                question = self.mind.curiosity.generate_question(
+                    context="something I'm seeing",
+                    phase=self.mind.development.current_phase,
+                )
+                self._emit(f"👁 {question}", "🤔")
+                self.mind.neurochemistry.dopamine.spike(0.05)
+            elif surprise > 0.3:
+                self._emit("I see something interesting...", "👁")
+
+        except Exception as e:
+            # Camera might not be available — that's OK, we're just blind
+            logger.debug("[vision] Camera not available: %s", e)
 
     # =========================================================================
     # Stats

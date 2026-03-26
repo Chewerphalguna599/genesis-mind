@@ -120,6 +120,9 @@ Genesis is not turn-based. When you start it, **6 daemon threads** run simultane
 ├──────────────────┼──────────────────────────────────────────┤
 │ Curiosity        │ Surfaces burning unanswered questions —  │
 │ (every 20s)      │ curiosity bubbles up autonomously         │
+├──────────────────┼──────────────────────────────────────────┤
+│ Vision           │ Always-on camera — captures, embeds via  │
+│ (every 3s)       │ CLIP, processes through neural cascade    │
 └──────────────────┴──────────────────────────────────────────┘
                     ↑
          CLI / API is just ONE input channel
@@ -127,6 +130,23 @@ Genesis is not turn-based. When you start it, **6 daemon threads** run simultane
 ```
 
 The CLI is not the brain — it's a window into it. Genesis is thinking, feeling, and aging whether you type or not.
+
+## Neural Growth (Neuroplasticity)
+
+A real brain doesn't start full-sized. It **grows**:
+
+```
+Phase 0 (Newborn):     128-dim hidden   →  ~600K params
+Phase 1 (Infant):      192-dim hidden   →  ~900K params
+Phase 2 (Toddler):     256-dim hidden   →  ~1.2M params
+Phase 3 (Child):       384-dim hidden   →  ~2.5M params
+Phase 4 (Adolescent):  512-dim hidden   →  ~4.5M params
+Phase 5 (Adult):       640-dim hidden   →  ~7M params
+```
+
+At each developmental phase transition, the neural networks **physically grow** — wider layers, deeper circuits. New neurons are initialized from existing weight statistics (not random), preserving learned patterns while adding capacity.
+
+A Newborn Genesis literally **cannot** think as complexly as a Child Genesis — the hardware isn't there yet.
 
 ## The Soul
 

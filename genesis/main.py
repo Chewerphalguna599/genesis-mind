@@ -40,6 +40,7 @@ from genesis.growth.sleep import SleepCycle
 from genesis.soul.consciousness import Consciousness
 from genesis.soul.neurochemistry import Neurochemistry
 from genesis.neural.subconscious import Subconscious
+from genesis.neural.neuroplasticity import Neuroplasticity
 from genesis.senses.voice import Voice
 from genesis.senses.proprioception import Proprioception
 from genesis.soul.drives import DriveSystem
@@ -115,6 +116,9 @@ class GenesisMind:
             auto_sleep_experiences=self.config.growth.auto_sleep_experiences,
             auto_sleep_hours=self.config.growth.auto_sleep_hours,
         )
+
+        # --- V4.3: Neuroplasticity (Network Growth) ---
+        self.neuroplasticity = Neuroplasticity()
 
         # --- V4: Voice (TTS Output) ---
         self.voice = Voice(
@@ -303,6 +307,18 @@ class GenesisMind:
         neural_stats = self.subconscious.get_stats()
         curiosity_stats = self.curiosity.get_stats()
         milestone = self.consciousness.check_developmental_progress()
+
+        # V4.3: Neural Growth — physically grow networks on phase transition
+        if milestone and self.neuroplasticity.should_grow(
+            self.development.current_phase, self.subconscious
+        ):
+            growth_report = self.neuroplasticity.grow_networks(
+                self.development.current_phase, self.subconscious
+            )
+            self.subconscious.save_all()
+            self.voice.say(
+                f"My brain is growing. {growth_report['params_added']} new neural connections formed."
+            )
 
         # V4: Decode the neural network's own voice
         neural_voice = self.subconscious.decode_response(
