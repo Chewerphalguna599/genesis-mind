@@ -327,14 +327,22 @@ class PersonalityNetwork:
     def load_weights(self, path: Path):
         """Restore the personality — bring this person back to life."""
         if path.exists():
-            checkpoint = torch.load(path, map_location='cpu', weights_only=False)
-            self.network.load_state_dict(checkpoint['state_dict'])
-            self._hidden_state = checkpoint.get('hidden_state', None)
-            self._total_experiences = checkpoint.get('experiences', 0)
-            self._training_steps = checkpoint.get('training_steps', 0)
-            self._total_loss = checkpoint.get('total_loss', 0.0)
-            self._total_predictions = checkpoint.get('predictions', 0)
-            logger.info("Personality loaded (%d prior experiences)", self._total_experiences)
+            try:
+                checkpoint = torch.load(path, map_location='cpu', weights_only=False)
+                self.network.load_state_dict(checkpoint['state_dict'])
+                self._hidden_state = checkpoint.get('hidden_state', None)
+                self._total_experiences = checkpoint.get('experiences', 0)
+                self._training_steps = checkpoint.get('training_steps', 0)
+                self._total_loss = checkpoint.get('total_loss', 0.0)
+                self._total_predictions = checkpoint.get('predictions', 0)
+                logger.info("Personality loaded (%d prior experiences)", self._total_experiences)
+            except RuntimeError as e:
+                logger.warning(
+                    "Personality weights incompatible (network grew?) — starting fresh. "
+                    "Error: %s", str(e)[:200]
+                )
+                # Remove stale file so it doesn't block future starts
+                path.unlink(missing_ok=True)
 
     def get_stats(self) -> dict:
         return {
