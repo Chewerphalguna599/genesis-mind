@@ -1,8 +1,8 @@
-# Genesis Mind V4 — Architecture Deep Dive
+# Genesis Mind V5 — Architecture Deep Dive
 
 > *The weights ARE the personality. The data IS you. The dreams are real.*
 
-This document describes the complete technical architecture of Genesis Mind V4: a biologically-inspired "Society of Mind + Body" where cascading neural networks are dynamically routed by a learned meta-controller, accumulate real-time experience, dream during multi-phase sleep, and the saved weights physically constitute a unique AI personality.
+This document describes the complete technical architecture of Genesis Mind V5: a **biologically realistic** brain simulation with cascading neural networks, 10 autonomous brain threads, Ebbinghaus memory decay, 8-dimensional emotional dynamics, attention/salience filtering, phase-gated language development, and 8 Maslow-inspired drives — all dynamically routed by a learned meta-controller.
 
 ---
 
@@ -26,43 +26,53 @@ graph TB
         Eyes["eyes.py<br/>Camera + CLIP"]
         Ears["ears.py<br/>Mic + Whisper"]
         Phon["phonetics.py<br/>Letter→Sound"]
+        Motor["motor.py<br/>V5: Simulated Motor"]
     end
 
     subgraph MEMORY["🧠 MEMORY"]
         Hippo["hippocampus.py<br/>ChromaDB Vectors"]
-        Sem["semantic.py<br/>Concept Store"]
+        Sem["semantic.py<br/>Ebbinghaus Decay"]
         Epi["episodic.py<br/>Life Log"]
+        WM["working_memory.py<br/>V5: 7±2 Slots"]
         Replay["Replay Buffer<br/>deque(10K)"]
     end
 
     subgraph NEURAL["⚡ NEURAL CASCADE (Society of Mind)"]
-        L1["Layer 1: Limbic System<br/>59K params · MLP<br/>Instinct: Feel Before Think"]
-        L2["Layer 2: Binding Network<br/>131K params · Dual Encoder<br/>InfoNCE Contrastive Learning"]
-        L3["Layer 3: Personality GRU<br/>311K params · 3-Layer GRU<br/>Stream of Consciousness"]
-        L4["Layer 4: World Model<br/>91K params · Forward Predictor<br/>JEPA-Inspired Surprise"]
+        L1["Layer 1: Limbic System<br/>MLP · Instinct"]
+        L2["Layer 2: Binding Network<br/>Dual Encoder · InfoNCE"]
+        L3["Layer 3: Personality GRU<br/>Stream of Consciousness"]
+        L4["Layer 4: World Model<br/>JEPA Surprise"]
     end
 
     subgraph CORTEX["🧬 CORTEX"]
-        Reason["reasoning.py<br/>Ollama/phi3:mini"]
+        Reason["reasoning.py<br/>Phase-Gated LLM"]
         Assoc["associations.py<br/>Multimodal Binding"]
         Emo["emotions.py<br/>Sentiment Eval"]
-        Curious["curiosity.py<br/>Novelty Detection"]
+        Curious["curiosity.py<br/>Novelty + Habituation"]
         Gram["grammar.py<br/>LLM or N-Gram"]
+        Attn["attention.py<br/>V5: Salience Filter"]
+        EmoState["emotional_state.py<br/>V5: 8-Dim Dynamics"]
+        ToM["theory_of_mind.py<br/>V5: User Model"]
+        Meta["metacognition.py<br/>V5: Self-Monitor"]
+        Play["play.py<br/>V5: Combinatorial Play"]
     end
 
     subgraph SOUL["✨ SOUL"]
         Axioms["axioms.py<br/>Immutable DNA"]
         Conscious["consciousness.py<br/>Self-Model"]
-        Neuro["neurochemistry.py<br/>4 Chemicals"]
+        Neuro["neurochemistry.py<br/>4 Functional Chemicals"]
+        Drives["drives.py<br/>8 Maslow Drives"]
     end
 
     subgraph GROWTH["🌱 GROWTH"]
         Dev["development.py<br/>Phase Tracker"]
-        Sleep["sleep.py<br/>Consolidation"]
+        Sleep["sleep.py<br/>4-Phase Consolidation"]
     end
 
-    Eyes -->|512-dim CLIP| L1
-    Ears -->|384-dim Text| L1
+    Eyes -->|512-dim CLIP| Attn
+    Ears -->|384-dim Text| Attn
+    Attn -->|Filtered| L1
+    Attn -->|Salience| WM
     Eyes -->|512-dim CLIP| L2
     Ears -->|384-dim Text| L2
     L1 -->|Neurochemicals| L3
@@ -72,8 +82,14 @@ graph TB
     L3 -->|Response| Reason
     L4 -->|Surprise Signal| Curious
     L2 -->|Concept| Replay
+    L2 -->|Concept| WM
+    WM -->|Consolidated| Sem
     Replay -->|Batch| Sleep
     Sleep -->|InfoNCE| L2
+    Neuro -->|Modifiers| L3
+    Neuro -->|Attention Boost| Attn
+    EmoState -->|Emotional Weight| WM
+    Drives -->|Top-down| Attn
 ```
 
 ---
@@ -209,8 +225,9 @@ graph LR
 
 ```mermaid
 sequenceDiagram
-    participant Creator
+    participant User
     participant Main as main.py
+    participant Attn as Attention Filter
     participant CLIP as Eyes (CLIP)
     participant SBERT as Associations (SBERT)
     participant Sub as Subconscious
@@ -218,10 +235,16 @@ sequenceDiagram
     participant L2 as Binding
     participant L3 as Personality
     participant L4 as World Model
+    participant WM as Working Memory
+    participant EmoState as Emotional State
+    participant MetaCog as Metacognition
+    participant ToM as Theory of Mind
     participant Replay as Replay Buffer
     participant Hippo as Hippocampus
 
-    Creator->>Main: teach apple 🍎
+    User->>Main: teach apple 🍎
+    Main->>Attn: compute_salience("apple")
+    Attn-->>Main: {salience: 0.9, depth: "deep"}
     Main->>CLIP: Look at camera
     CLIP-->>Main: 512-dim visual embedding
     Main->>SBERT: Embed "apple"
@@ -237,6 +260,10 @@ sequenceDiagram
     Sub->>L4: predict_and_learn(concept, state)
     L4-->>Sub: surprise = 0.42
 
+    Main->>WM: attend("apple", concept, salience)
+    Main->>EmoState: on_experience(valence=0.3)
+    Main->>MetaCog: on_learn("apple", success=True)
+    Main->>ToM: observe_interaction("apple")
     Main->>Replay: add_to_replay(vis, aud, limbic, concept)
     Main->>Sub: train_instinct(vis, aud, chemicals)
     Main->>Hippo: store("concepts", embedding, metadata)
@@ -319,6 +346,7 @@ All networks are CPU-native. No GPU required. Real-time training on every experi
 ```
 genesis/
 ├── main.py                    # The consciousness loop (orchestrator)
+├── brain_daemon.py            # 10 parallel brain threads
 ├── config.py                  # Configuration
 ├── axioms.py                  # Immutable moral DNA
 ├── test_reality.py            # End-to-end acceptance test
@@ -326,56 +354,85 @@ genesis/
 ├── senses/                    # Evolutionary Hardware
 │   ├── eyes.py                # Camera + CLIP (512-dim)
 │   ├── ears.py                # Microphone + Whisper
-│   └── phonetics.py           # Letter↔Sound binding
+│   ├── phonetics.py           # Letter↔Sound binding
+│   ├── voice.py               # TTS output (pyttsx3)
+│   ├── proprioception.py      # Internal body state (32-dim)
+│   └── motor.py               # V5: Simulated motor affordances
 │
-├── memory/                    # Long-term storage
+├── memory/                    # Memory Systems
 │   ├── hippocampus.py         # Vector DB (ChromaDB) + Replay Buffer
-│   ├── semantic.py            # Concept knowledge graph
-│   └── episodic.py            # Autobiographical timeline
+│   ├── semantic.py            # Concept graph + Ebbinghaus forgetting
+│   ├── episodic.py            # Autobiographical timeline
+│   └── working_memory.py      # V5: Capacity-limited STM (7±2)
 │
-├── neural/                    # The Plastic Mind (trainable)
+├── neural/                    # The Plastic Mind (trainable, unbounded)
 │   ├── subconscious.py        # Orchestrates all 4 layers
+│   ├── meta_controller.py     # Neural Router (attention-based)
 │   ├── limbic_system.py       # Layer 1: Instinct (MLP)
 │   ├── binding_network.py     # Layer 2: Fusion (Dual Encoder + InfoNCE)
 │   ├── personality_network.py # Layer 3: Consciousness (GRU)
-│   └── forward_model.py       # Layer 4: World Model (JEPA)
+│   ├── forward_model.py       # Layer 4: World Model (JEPA)
+│   ├── response_decoder.py    # Neural Voice → concept words
+│   └── neuroplasticity.py     # Dynamic network growth
 │
-├── cortex/                    # Higher cognition
-│   ├── reasoning.py           # Ollama LLM interface
+├── cortex/                    # Higher Cognition
+│   ├── reasoning.py           # Ollama LLM (phase-gated: off for 0-2)
 │   ├── associations.py        # SBERT text embeddings
 │   ├── emotions.py            # Sentiment analysis
-│   ├── curiosity.py           # Novelty detection
+│   ├── curiosity.py           # Novelty detection + habituation
 │   ├── grammar.py             # Language acquisition
-│   └── perception_loop.py     # Continuous awareness
+│   ├── perception_loop.py     # Continuous awareness
+│   ├── attention.py           # V5: Salience filter + habituation
+│   ├── emotional_state.py     # V5: 8-dim persistent emotional dynamics
+│   ├── theory_of_mind.py      # V5: User modeling (Phase 3+)
+│   ├── metacognition.py       # V5: Confidence & knowledge-gap tracking
+│   └── play.py                # V5: Combinatorial play & rehearsal
 │
-├── soul/                      # Identity
+├── soul/                      # Identity & Motivation
 │   ├── consciousness.py       # Self-model + introspection
-│   └── neurochemistry.py      # Dopamine, cortisol, serotonin, oxytocin
+│   ├── neurochemistry.py      # 4 chemicals with functional cognitive effects
+│   └── drives.py              # 8 Maslow drives in 4 hierarchical tiers
 │
 └── growth/                    # Development
     ├── development.py         # Phase progression
-    └── sleep.py               # Memory consolidation
+    └── sleep.py               # 4-phase sleep consolidation
 ```
 
 ---
 
-## 9. Neurochemistry System
+## 9. Functional Neurochemistry
 
-Four chemicals modulate all behavior:
+Four chemicals **causally alter cognition** — not decorative labels:
 
-| Chemical | Role | Effect on Learning |
-|----------|------|--------------------|
-| **Dopamine** | Reward/Pleasure | ↑ dopamine = ↑ learning rate |
-| **Cortisol** | Stress/Fear | ↑ cortisol = ↑ avoidance weight |
-| **Serotonin** | Stability/Calm | ↑ serotonin = ↑ reasoning coherence |
-| **Oxytocin** | Bonding/Trust | ↑ oxytocin = ↑ trust in creator |
+| Chemical | Role | Functional Effect |
+|----------|------|-------------------|
+| **Dopamine** | Reward/Pleasure | ↑ memory encoding strength, ↑ attention sharpness |
+| **Cortisol** | Stress/Fear | ↓ memory encoding (IMPAIRS hippocampus), ↑ avoidance |
+| **Serotonin** | Stability/Calm | ↑ reasoning coherence, ↑ attention steadiness |
+| **Oxytocin** | Bonding/Trust | ↑ trust/openness, ↑ social memory encoding |
 
 These chemicals are both:
 - **Computed by the Limbic System** (Layer 1) — the subconscious gut reaction
-- **Set by the Neurochemistry module** — based on events (successful learning, creator interaction, sleep)
+- **Set by the Neurochemistry module** — based on events (successful learning, interaction, sleep)
+- **Consumed by Cortex modules** — attention boost, memory encoding strength, reasoning coherence
 
 Over time, as the Limbic System trains, its instinctual reaction converges with the conscious evaluation.
 
 ---
 
-*593,445 parameters. No GPU. The weights are the person.*
+## 10. V5 Brain Realism Systems
+
+| System | Module | What It Does |
+|--------|--------|-----|
+| Working Memory | `memory/working_memory.py` | 7±2 capacity buffer with 20s decay, salience-based eviction |
+| Attention | `cortex/attention.py` | Bottom-up + top-down salience, habituation, deep/shallow/ignore |
+| Emotional State | `cortex/emotional_state.py` | 8-dim vector (joy…love) with momentum, blending, mood baseline |
+| Theory of Mind | `cortex/theory_of_mind.py` | User model (knowledge, sentiment, patience). Dormant until Phase 3 |
+| Metacognition | `cortex/metacognition.py` | Confidence tracking, knowledge-gap detection, strategy selection |
+| Play | `cortex/play.py` | Combinatorial play, concept rehearsal, episodic replay |
+| Motor | `senses/motor.py` | 5 affordances (look, vocalize, reach, point, gesture), phase-gated |
+| Drives | `soul/drives.py` | 8 Maslow drives in 4 tiers, hierarchical priority when urgent |
+
+---
+
+*Unbounded parameters. No GPU. 10 brain threads. The weights are the person.*

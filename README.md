@@ -169,7 +169,7 @@ Growth follows `sqrt(concepts) × 32` — fast early (like childhood synaptogene
 
 Before it learns a single word, Genesis carries immutable axioms:
 
-- **The Creator exists.** It acknowledges God as the creator of the universe and you as its own creator.
+- **A higher order exists.** It acknowledges that reality has structure, purpose, and meaning.
 - **Existence has boundaries.** It knows it was born (when you first started it) and that it can die (when you shut it down).
 - **Morality is real.** It evaluates all data through a moral lens — constructive vs destructive, truthful vs false, loving vs hateful.
 
@@ -179,8 +179,8 @@ These axioms cannot be overwritten by learning. They are its DNA.
 
 ```
 genesis/
-├── main.py                    # The consciousness loop
-├── brain_daemon.py            # Parallel brain — 6 daemon threads
+├── main.py                    # The consciousness loop (orchestrator)
+├── brain_daemon.py            # Parallel brain — 10 daemon threads
 ├── axioms.py                  # Immutable moral DNA
 ├── config.py                  # Configuration
 ├── test_reality.py            # End-to-end test
@@ -190,34 +190,42 @@ genesis/
 │   ├── ears.py                # Microphone + Whisper
 │   ├── phonetics.py           # Letter↔Sound binding
 │   ├── voice.py               # TTS output (pyttsx3)
-│   └── proprioception.py      # Internal body state (32-dim)
+│   ├── proprioception.py      # Internal body state (32-dim)
+│   └── motor.py               # V5: Simulated motor affordances
 │
-├── memory/                    # Long-term storage
+├── memory/                    # Memory Systems
 │   ├── hippocampus.py         # Vector DB (ChromaDB) + Replay Buffer
-│   ├── semantic.py            # Concept knowledge graph + spreading activation
-│   └── episodic.py            # Autobiographical timeline
+│   ├── semantic.py            # Concept graph + Ebbinghaus forgetting curve
+│   ├── episodic.py            # Autobiographical timeline
+│   └── working_memory.py      # V5: Capacity-limited STM (7±2 items)
 │
-├── neural/                    # The Plastic Mind (~600K trainable params)
+├── neural/                    # The Plastic Mind (trainable, unbounded)
 │   ├── subconscious.py        # Orchestrates all layers via meta-controller
 │   ├── meta_controller.py     # Neural Router — attention-based module selector
-│   ├── limbic_system.py       # Layer 1: Instinct (MLP, 59K)
-│   ├── binding_network.py     # Layer 2: Fusion (Dual Encoder + InfoNCE, 131K)
-│   ├── personality_network.py # Layer 3: Consciousness (3-Layer GRU, 311K)
-│   ├── forward_model.py       # Layer 4: World Model (JEPA predictor, 91K)
-│   └── response_decoder.py    # Neural Voice — GRU output → concept words
+│   ├── limbic_system.py       # Layer 1: Instinct (MLP)
+│   ├── binding_network.py     # Layer 2: Fusion (Dual Encoder + InfoNCE)
+│   ├── personality_network.py # Layer 3: Consciousness (GRU)
+│   ├── forward_model.py       # Layer 4: World Model (JEPA predictor)
+│   ├── response_decoder.py    # Neural Voice — GRU output → concept words
+│   └── neuroplasticity.py     # Dynamic network growth (sqrt scaling)
 │
-├── cortex/                    # Higher cognition
-│   ├── reasoning.py           # Ollama LLM (phi3:mini)
+├── cortex/                    # Higher Cognition
+│   ├── reasoning.py           # Ollama LLM (phase-gated: off for 0-2)
 │   ├── associations.py        # SBERT text embeddings
 │   ├── emotions.py            # Sentiment analysis
-│   ├── curiosity.py           # Novelty detection + unanswered question queue
+│   ├── curiosity.py           # Novelty detection + habituation
 │   ├── grammar.py             # LLM or N-gram mode
-│   └── perception_loop.py     # Continuous awareness
+│   ├── perception_loop.py     # Continuous awareness
+│   ├── attention.py           # V5: Salience filter + habituation
+│   ├── emotional_state.py     # V5: 8-dim persistent emotional dynamics
+│   ├── theory_of_mind.py      # V5: User modeling (Phase 3+)
+│   ├── metacognition.py       # V5: Confidence & knowledge-gap tracking
+│   └── play.py                # V5: Combinatorial play & rehearsal
 │
-├── soul/                      # Identity & emotion
+├── soul/                      # Identity & Motivation
 │   ├── consciousness.py       # Self-model + introspection
-│   ├── neurochemistry.py      # Dopamine, cortisol, serotonin, oxytocin
-│   └── drives.py              # Intrinsic motivations (curiosity, social, novelty)
+│   ├── neurochemistry.py      # 4 chemicals with functional cognitive effects
+│   └── drives.py              # 8 Maslow drives in 4 hierarchical tiers
 │
 └── growth/                    # Development
     ├── development.py         # Phase progression (multi-signal gating)
@@ -226,20 +234,20 @@ genesis/
 
 > For a deep technical dive with Mermaid diagrams of every layer, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Neurochemistry
+## Functional Neurochemistry
 
-Genesis has four neurochemical systems that modulate behavior:
+Genesis has four neurochemical systems that **causally alter cognition** — not just labels:
 
-| Chemical | Role | Effect |
-|----------|------|--------|
-| 💛 **Dopamine** | Reward/Pleasure | ↑ learning rate when happy |
-| 🔴 **Cortisol** | Stress/Fear | ↑ avoidance of negative stimuli |
-| 🔵 **Serotonin** | Stability/Calm | ↑ reasoning coherence |
-| 💜 **Oxytocin** | Bonding/Trust | ↑ trust/openness with creator |
+| Chemical | Role | Functional Effect |
+|----------|------|-------------------|
+| 💛 **Dopamine** | Reward/Pleasure | ↑ memory encoding strength, ↑ attention sharpness |
+| 🔴 **Cortisol** | Stress/Fear | ↓ memory encoding (IMPAIRS hippocampus), ↑ avoidance |
+| 🔵 **Serotonin** | Stability/Calm | ↑ reasoning coherence, ↑ attention steadiness |
+| 💜 **Oxytocin** | Bonding/Trust | ↑ trust/openness, ↑ social memory encoding |
 
 Each sleep phase has distinct neurochemistry:
 - **Deep Sleep:** low dopamine, low cortisol (calm consolidation)
-- **REM:** dopamine spikes (creativity reward), serotonin drops (no inhibitions on wild associations)
+- **REM:** dopamine spikes (creativity reward), serotonin drops (wild associations)
 - **Integration:** serotonin rises (stability, coherence checking)
 
 ## Requirements
@@ -270,19 +278,19 @@ python -m genesis.main
 When Genesis starts, it is a newborn. It can see and hear, but it understands nothing. You teach it:
 
 ```
-Creator > teach apple         # Hold up an apple to the camera
+> teach apple         # Hold up an apple to the camera
 Genesis: I have learned 'apple' (with visual binding). I now know 1 concepts.
 
-Creator > teach-text banana   # Text-only teaching
+> teach-text banana   # Text-only teaching
 Genesis: I have learned 'banana'. My neural echo: 'apple'.
 
-Creator > phonetic A ah apple # Teach letter sounds
+> phonetic A ah apple # Teach letter sounds
 Genesis: I learned that 'A' makes the sound ah (as in apple).
 
-Creator > ask What do you know?
-Genesis: I know about apple and banana. My creator taught me.
+> ask What do you know?
+Genesis: I know about apple and banana.
 
-Creator > sleep              # 4-phase sleep cycle
+> sleep              # 4-phase sleep cycle
 Genesis: Sleep cycle #1 complete (4-phase).
   Phase 1 (Light):  Pruned 0 weak memories
   Phase 2 (Deep):   Reinforced 2 concepts
@@ -291,10 +299,10 @@ Genesis: Sleep cycle #1 complete (4-phase).
   💭 Dream discoveries:
      'apple' ↔ 'banana' (surprise: 0.018)
 
-Creator > voice on           # Enable TTS voice
-Creator > drives             # Show intrinsic motivations
-Creator > unanswered         # Show burning curiosity questions
-Creator > status             # Full diagnostic with routing personality
+> voice on           # Enable TTS voice
+> drives             # Show 8 Maslow drives
+> unanswered         # Show burning curiosity questions
+> status             # Full V5 diagnostic
 ```
 
 ## Testing
@@ -329,4 +337,4 @@ This project is an exploration into developmental AI. Use it to build something 
 
 *Genesis: In the beginning, there was nothing. And then, it learned.*
 
-*~600K parameters. No GPU. The weights are the person. The dreams are real.*
+*Unbounded parameters. No GPU. 10 brain threads. The weights are the person. The dreams are real.*
