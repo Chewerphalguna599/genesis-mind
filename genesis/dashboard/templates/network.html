@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genesis Mind V5 — Neural Network</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chart.js and Vis.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="background-anim"></div>
+    
+    <header class="app-header">
+        <div class="logo">
+            <div class="pulse-ring"></div>
+            <h1>Genesis Mind <span>V5</span></h1>
+            <span class="badge" id="phase-badge">Phase 1 (Infant)</span>
+        </div>
+        <nav class="top-nav">
+            <a href="/" class="nav-link">Dashboard</a>
+            <a href="/network" class="nav-link active">Neural Network</a>
+        </nav>
+        <div class="status-indicator">
+            <span class="dot live"></span>
+            <span id="connection-status">Live Consciousness Sync</span>
+        </div>
+    </header>
+
+    <main class="network-fullscreen" style="padding: 0 2rem 2rem 2rem; height: calc(100vh - 100px);">
+        <section class="glass-panel" style="height: 100%; display: flex; flex-direction: column;">
+            <div class="panel-header" style="flex-shrink: 0; margin-bottom: 1rem;">
+                <h2><i class="icon">🕸</i> Semantic-Episodic Binding Network</h2>
+                <div style="display: flex; gap: 1rem;">
+                    <span class="capacity-tag"><span id="concept-count">0</span> Concepts</span>
+                    <span class="capacity-tag" style="background: rgba(79, 195, 247, 0.2);"><span id="node-count">0</span> Nodes Listed</span>
+                </div>
+            </div>
+            <div class="chart-container" id="network-canvas" style="flex-grow: 1; min-height: 0; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <!-- Vis.js canvas goes here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- App Logic -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

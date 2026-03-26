@@ -42,6 +42,10 @@ class DashboardServer:
         def index():
             return render_template("index.html")
             
+        @self.app.route('/network')
+        def network():
+            return render_template("network.html")
+            
         @self.app.route('/api/state')
         def state():
             if not _mind_instance:
@@ -155,7 +159,7 @@ class DashboardServer:
                             "id": c.word, 
                             "label": c.word, 
                             "group": "concept", 
-                            "value": getattr(c, 'strength', 1.0)
+                            "title": f"Strength: {getattr(c, 'strength', 1.0):.2f}"
                         })
                         for rel in getattr(c, 'relationships', []):
                             edges.append({"from": c.word, "to": rel})

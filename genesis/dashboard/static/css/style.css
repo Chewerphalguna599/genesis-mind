@@ -106,6 +106,31 @@ h1 span {
     letter-spacing: 1px;
 }
 
+/* Navigation */
+.top-nav {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+.nav-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+.nav-link:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+.nav-link.active {
+    color: var(--accent);
+    background: rgba(79, 195, 247, 0.1);
+}
+
+
 .status-indicator {
     display: flex;
     align-items: center;

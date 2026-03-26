@@ -23,8 +23,8 @@ const networkContainer = document.getElementById('network-canvas');
 const networkOptions = {
     nodes: {
         shape: 'dot',
-        size: 16,
-        font: { size: 12, color: '#f0f0f5', face: 'Inter' },
+        size: 20,
+        font: { size: 14, color: '#f0f0f5', face: 'Inter', strokeWidth: 3, strokeColor: '#0a0a0c' },
         borderWidth: 2,
         color: {
             background: 'rgba(79, 195, 247, 0.2)',
@@ -33,12 +33,12 @@ const networkOptions = {
         }
     },
     edges: {
-        width: 1,
-        color: { color: 'rgba(255,255,255,0.1)', highlight: '#4fc3f7' },
+        width: 1.5,
+        color: { color: 'rgba(255,255,255,0.15)', highlight: '#4fc3f7' },
         smooth: { type: 'continuous' }
     },
     physics: {
-        barnesHut: { gravitationalConstant: -2000, centralGravity: 0.3, springLength: 95 }
+        barnesHut: { gravitationalConstant: -4000, centralGravity: 0.1, springLength: 150, springConstant: 0.02 }
     }
 };
 
@@ -65,6 +65,7 @@ const valOxytocin = document.getElementById('val-oxytocin');
 
 // Pre-create 128 hidden state cells
 function initHiddenStateViz() {
+    if (!hiddenStateContainer) return;
     for (let i = 0; i < 128; i++) {
         const cell = document.createElement('div');
         cell.className = 'hs-cell';
@@ -78,82 +79,88 @@ function initCharts() {
     Chart.defaults.font.family = 'Inter';
 
     // 8D Emotional State Radar Chart
-    const ctxEmotion = document.getElementById('emotionChart').getContext('2d');
-    emotionChart = new Chart(ctxEmotion, {
-        type: 'radar',
-        data: {
-            labels: ['Joy', 'Fear', 'Anger', 'Sadness', 'Trust', 'Disgust', 'Anticipation', 'Surprise'],
-            datasets: [{
-                label: 'Current Emotional Vector',
-                data: [0, 0, 0, 0, 0, 0, 0, 0],
-                backgroundColor: 'rgba(79, 195, 247, 0.2)',
-                borderColor: '#4fc3f7',
-                pointBackgroundColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#4fc3f7',
-                borderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                r: {
-                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                    pointLabels: { color: '#f0f0f5', font: { size: 11 } },
-                    ticks: { display: false, max: 1.0, min: -0.2 }
-                }
+    const elEmotion = document.getElementById('emotionChart');
+    if (elEmotion) {
+        const ctxEmotion = elEmotion.getContext('2d');
+        emotionChart = new Chart(ctxEmotion, {
+            type: 'radar',
+            data: {
+                labels: ['Joy', 'Fear', 'Anger', 'Sadness', 'Trust', 'Disgust', 'Anticipation', 'Surprise'],
+                datasets: [{
+                    label: 'Current Emotional Vector',
+                    data: [0, 0, 0, 0, 0, 0, 0, 0],
+                    backgroundColor: 'rgba(79, 195, 247, 0.2)',
+                    borderColor: '#4fc3f7',
+                    pointBackgroundColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#4fc3f7',
+                    borderWidth: 2,
+                }]
             },
-            plugins: { legend: { display: false } }
-        }
-    });
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        pointLabels: { color: '#f0f0f5', font: { size: 11 } },
+                        ticks: { display: false, max: 1.0, min: -0.2 }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
 
     // 8 Maslow Drives Bar Chart
-    const ctxDrives = document.getElementById('drivesChart').getContext('2d');
-    drivesChart = new Chart(ctxDrives, {
-        type: 'bar',
-        data: {
-            labels: ['Fatigue', 'Hunger', 'Fear', 'Novelty', 'Curiosity', 'Social', 'Play', 'Meaning'],
-            datasets: [{
-                label: 'Drive Activation',
-                data: [0,0,0,0,0,0,0,0],
-                backgroundColor: [
-                    '#ef5350', '#ef5350', // Survival
-                    '#ffd54f', '#ffd54f', // Security 
-                    '#4fc3f7', '#4fc3f7', '#4fc3f7', // Social/Cognitive
-                    '#ba68c8'             // Transcendence
-                ],
-                borderRadius: 4
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    max: 1.0,
-                    min: 0,
-                    grid: { color: 'rgba(255,255,255,0.05)' }
-                },
-                y: {
-                    grid: { display: false }
-                }
+    const elDrives = document.getElementById('drivesChart');
+    if (elDrives) {
+        const ctxDrives = elDrives.getContext('2d');
+        drivesChart = new Chart(ctxDrives, {
+            type: 'bar',
+            data: {
+                labels: ['Fatigue', 'Hunger', 'Fear', 'Novelty', 'Curiosity', 'Social', 'Play', 'Meaning'],
+                datasets: [{
+                    label: 'Drive Activation',
+                    data: [0,0,0,0,0,0,0,0],
+                    backgroundColor: [
+                        '#ef5350', '#ef5350', // Survival
+                        '#ffd54f', '#ffd54f', // Security 
+                        '#4fc3f7', '#4fc3f7', '#4fc3f7', // Social/Cognitive
+                        '#ba68c8'             // Transcendence
+                    ],
+                    borderRadius: 4
+                }]
             },
-            plugins: { legend: { display: false } }
-        }
-    });
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        max: 1.0,
+                        min: 0,
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    y: {
+                        grid: { display: false }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
 }
 
 function updateUI(state) {
     if (state.status === "booting...") return;
 
     // Phase Status
-    phaseBadge.textContent = `Phase ${state.core.phase} (${state.core.phase_name})`;
+    if (phaseBadge) phaseBadge.textContent = `Phase ${state.core.phase} (${state.core.phase_name})`;
 
     // Threads
-    if (state.threads) {
+    if (state.threads && threadsContainer) {
         threadsContainer.innerHTML = '';
         for (const [name, data] of Object.entries(state.threads)) {
             threadsContainer.innerHTML += `
@@ -228,7 +235,7 @@ function updateUI(state) {
     }
 
     // Working Memory
-    if (state.working_memory) {
+    if (state.working_memory && wmUsage && wmCapacity && wmContainer) {
         wmUsage.textContent = state.working_memory.usage;
         wmCapacity.textContent = state.working_memory.capacity;
         wmContainer.innerHTML = '';
@@ -251,7 +258,7 @@ function updateUI(state) {
     }
 
     // Neurochemistry
-    if (state.neurochemistry) {
+    if (state.neurochemistry && chemDopamine && chemCortisol && chemSerotonin && chemOxytocin) {
         const d = state.neurochemistry.dopamine || 0;
         const c = state.neurochemistry.cortisol || 0;
         const s = state.neurochemistry.serotonin || 0;
@@ -262,30 +269,32 @@ function updateUI(state) {
         chemSerotonin.style.width = `${s * 100}%`;
         chemOxytocin.style.width = `${o * 100}%`;
         
-        valDopamine.textContent = d.toFixed(3);
-        valCortisol.textContent = c.toFixed(3);
-        valSerotonin.textContent = s.toFixed(3);
-        valOxytocin.textContent = o.toFixed(3);
+        if (valDopamine) valDopamine.textContent = d.toFixed(3);
+        if (valCortisol) valCortisol.textContent = c.toFixed(3);
+        if (valSerotonin) valSerotonin.textContent = s.toFixed(3);
+        if (valOxytocin) valOxytocin.textContent = o.toFixed(3);
     }
 
     // Neural Stats
     if (state.neural) {
-        conceptCount.textContent = state.neural.layer2_binding.learned_concepts.toLocaleString();
-        expCount.textContent = state.neural.layer3_personality.total_experiences.toLocaleString();
-        surpriseLoss.textContent = state.neural.layer4_world_model.last_loss.toFixed(4);
+        if (conceptCount) conceptCount.textContent = state.neural.layer2_binding.learned_concepts.toLocaleString();
+        if (expCount) expCount.textContent = state.neural.layer3_personality.total_experiences.toLocaleString();
+        if (surpriseLoss) surpriseLoss.textContent = state.neural.layer4_world_model.last_loss.toFixed(4);
 
         // Update hidden state cells
-        const cells = hiddenStateContainer.children;
-        const hs = state.neural.layer3_personality.hidden_state_activation || [];
-        for (let i = 0; i < cells.length; i++) {
-            if (i < hs.length) {
-                // Map activation value to opacity/color
-                const val = hs[i];
-                // normalize roughly from -1 to 1 for visual
-                const intensity = Math.min(Math.max((val + 1) / 2, 0), 1);
-                cells[i].style.backgroundColor = `rgba(79, 195, 247, ${intensity})`;
-            } else {
-                cells[i].style.backgroundColor = 'rgba(255,255,255,0.05)';
+        if (hiddenStateContainer) {
+            const cells = hiddenStateContainer.children;
+            const hs = state.neural.layer3_personality.hidden_state_activation || [];
+            for (let i = 0; i < cells.length; i++) {
+                if (i < hs.length) {
+                    // Map activation value to opacity/color
+                    const val = hs[i];
+                    // normalize roughly from -1 to 1 for visual
+                    const intensity = Math.min(Math.max((val + 1) / 2, 0), 1);
+                    cells[i].style.backgroundColor = `rgba(79, 195, 247, ${intensity})`;
+                } else {
+                    cells[i].style.backgroundColor = 'rgba(255,255,255,0.05)';
+                }
             }
         }
     }
