@@ -112,6 +112,7 @@ class Eyes:
         )
 
         self._last_frame = frame_resized.copy()
+        self._last_frame_full = frame  # Full-res for dashboard
         return percept
 
     def embed(self, percept: VisualPercept, train: bool = True) -> np.ndarray:

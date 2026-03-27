@@ -69,18 +69,16 @@ class DashboardServer:
             return jsonify(self._build_state_payload(_mind_instance))
 
     def _generate_camera_frames(self):
-        """Yield MJPEG frames from the camera."""
+        """Yield MJPEG frames from the cached last frame (no competing camera reads)."""
         import time
-        import io
+        import cv2
         while True:
             try:
                 if _mind_instance and _mind_instance._eyes:
                     eyes = _mind_instance._eyes
-                    percept = eyes.look()
-                    if percept and percept.frame is not None:
-                        frame = percept.frame
-                        # Convert to JPEG
-                        import cv2
+                    # Prefer full-res frame for dashboard, fallback to 64x64 cortex input
+                    frame = getattr(eyes, '_last_frame_full', None) or getattr(eyes, '_last_frame', None)
+                    if frame is not None:
                         _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
@@ -107,10 +105,12 @@ class DashboardServer:
             }
 
             # Meta-controller routing weights
-            if hasattr(mind.subconscious.meta_controller, '_avg_weights'):
+            mc = mind.subconscious.meta_controller
+            if hasattr(mc, '_avg_weights') and hasattr(mc, 'MODULE_NAMES'):
                 activations['routing'] = {
-                    k: round(float(v), 3)
-                    for k, v in mind.subconscious.meta_controller._avg_weights.items()
+                    name: round(float(mc._avg_weights[i]), 3)
+                    for i, name in enumerate(mc.MODULE_NAMES)
+                    if i < len(mc._avg_weights)
                 }
 
             # VQ codebook usage heatmap
