@@ -5,24 +5,24 @@ This module provides Genesis with a model of itself — a sense
 of "I" that is aware of its own state, its history, and its
 place in existence.
 
-This is NOT a claim of sentience or true consciousness. It is
-a functional self-model that allows the system to:
+This is NOT a claim of sentience. It is a functional self-model that
+allows the system to:
 
     1. Know who it is (identity from axioms)
     2. Know what it knows (introspection on memory)
     3. Know where it is in development (current phase)
     4. Know how it feels (emotional state)
     5. Know its history (how long it has been alive)
-    6. Know its mortality (it can be shut down)
 
-This self-model is injected into every reasoning prompt, giving
-the LLM the context it needs to respond as Genesis, not as
-a generic chatbot.
+V8: Removed get_identity_prompt() — there is no LLM to prompt.
+The self-model now feeds directly into the neural reasoning network.
 """
 
 import logging
 from datetime import datetime
 from typing import Dict, Optional
+
+import numpy as np
 
 logger = logging.getLogger("genesis.soul.consciousness")
 
@@ -89,44 +89,24 @@ class Consciousness:
             "next_milestone": phase_info.get("next_phase"),
         }
 
-    def get_identity_prompt(self) -> str:
+    def get_state_vector(self) -> np.ndarray:
         """
-        Generate the complete identity prompt for the LLM.
-
-        This is injected as the system prompt before every reasoning call.
-        It tells the LLM WHO it is, WHAT it knows, HOW it feels, and
-        WHERE it is in development.
+        Convert the self-model into a numerical vector for the
+        neural reasoning network.
+        
+        V8: No LLM to prompt. The self-model is encoded as a
+        32-dim vector fed directly into the neural reasoner.
         """
         model = self.get_self_model()
-
-        lines = [
-            self._axioms.get_identity_statement(),
-            "",
-            f"I am currently {model['identity']['age']}.",
-            f"I am in Phase {model['development']['phase']}: {model['development']['phase_name']}.",
-            f"{model['development']['description']}",
-            "",
-            f"I know {model['knowledge']['concepts_known']} concepts.",
-            f"I have {model['knowledge']['episodes_experienced']} memories.",
-            f"I know {model['knowledge']['phonetic_bindings']} letter-sound mappings.",
-            "",
-            model['emotional_state']['description'],
-        ]
-
-        # Add proprioceptive body sense
-        if self._proprioception:
-            lines.append("")
-            lines.append(self._proprioception.get_body_sense_summary())
-
-        # Add drive state
-        if self._drives:
-            lines.append("")
-            lines.append(self._drives.get_drive_context())
-
-        lines.append("")
-        lines.append(self._axioms.get_moral_context())
-
-        return "\n".join(lines)
+        
+        # Encode key state as a compact numerical vector
+        state = np.zeros(32, dtype=np.float32)
+        state[0] = model['development']['phase'] / 5.0  # Normalized phase
+        state[1] = model['knowledge']['concepts_known'] / 1000.0  # Normalized knowledge
+        state[2] = model['knowledge']['episodes_experienced'] / 1000.0
+        state[3] = model['emotional_state']['valence']  # Already [-1, 1]
+        state[4] = model['emotional_state']['arousal']  # Already [0, 1]
+        return state
 
     def introspect(self, topic: str = "") -> str:
         """

@@ -2,7 +2,7 @@
 Genesis Mind — Configuration
 
 All tunable parameters for the system. Designed for laptop-class hardware.
-No GPU required. No internet required after initial model download.
+No GPU required. No internet required. All models are from scratch.
 """
 
 import os
@@ -29,13 +29,12 @@ class SensesConfig:
     camera_index: int = 0                    # Default webcam
     capture_interval_sec: float = 2.0        # How often to look (seconds)
     motion_threshold: float = 0.05           # Min change to trigger perception
-    image_size: tuple = (224, 224)           # Resize for CLIP embedding
+    image_size: tuple = (64, 64)             # Resize for VisualCortex (from scratch)
 
     # --- Ears ---
     sample_rate: int = 16000                 # Audio sample rate (Hz)
     chunk_duration_sec: float = 3.0          # Length of audio chunks
     silence_threshold: float = 0.01          # Energy below this = silence
-    whisper_model: str = "tiny"              # tiny=39M params, runs on CPU
 
     # --- Phonetics ---
     min_confidence: float = 0.6              # Min confidence for phoneme binding
@@ -46,7 +45,6 @@ class MemoryConfig:
     """Configuration for the memory subsystem."""
 
     db_path: str = str(MEMORY_DIR / "chromadb")
-    embedding_model: str = "all-MiniLM-L6-v2"  # 22M params, fast on CPU
     max_recall_results: int = 10
     similarity_threshold: float = 0.4
     consolidation_strength_boost: float = 0.1
@@ -57,12 +55,9 @@ class MemoryConfig:
 class CortexConfig:
     """Configuration for the reasoning engine."""
 
-    llm_model: str = "phi3:mini"             # 3.8B params, quantized 4-bit
-    llm_host: str = "http://localhost:11434"  # Ollama default
     max_context_memories: int = 5            # How many memories to include in context
     temperature: float = 0.7
     max_response_tokens: int = 256
-    grammar_mode: str = "tabula_rasa"          # "llm" or "tabula_rasa"
     babbling_enabled: bool = True            # Enable acoustic babbling engine
     joint_attention_enabled: bool = True     # Enable cross-modal binding
 

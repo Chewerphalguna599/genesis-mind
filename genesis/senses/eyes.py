@@ -1,16 +1,13 @@
 """
-Genesis Mind — The Eyes
+Genesis Mind — The Eyes (V8: No Pretrained Models)
 
-The visual perception system. This is how Genesis sees the world.
+The visual perception system. Opens the webcam, captures frames,
+detects meaningful changes, and produces embeddings using the
+from-scratch VisualCortex (Conv2D autoencoder, ~50K params).
 
-It opens the laptop webcam, captures frames, detects meaningful changes
-in the visual field, and converts what it sees into mathematical
-representations (embeddings) that can be stored in memory and compared
-to other things it has seen before.
-
-Like a newborn's eyes — it sees everything but understands nothing.
-Understanding comes later, when the cortex binds what it sees to what
-it hears and what it is taught.
+V8 CHANGE: Removed CLIP ViT-B/32 (150M+ pretrained params).
+Vision is now entirely from-scratch. Genesis starts blind and
+learns to see through self-supervised reconstruction learning.
 """
 
 import time
@@ -27,18 +24,13 @@ logger = logging.getLogger("genesis.senses.eyes")
 
 @dataclass
 class VisualPercept:
-    """
-    A single moment of seeing.
-
-    Contains the raw image, its mathematical embedding, and metadata
-    about when and how it was captured.
-    """
+    """A single moment of seeing."""
     image: np.ndarray                       # Raw image (H, W, 3) BGR
-    embedding: Optional[np.ndarray] = None  # CLIP embedding (1, 512)
+    embedding: Optional[np.ndarray] = None  # Visual cortex embedding (64-dim)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    description: str = ""                   # Human-readable description (if available)
-    motion_score: float = 0.0               # How much changed since last frame
-    is_significant: bool = False            # Whether this percept is worth remembering
+    description: str = ""
+    motion_score: float = 0.0
+    is_significant: bool = False
 
 
 class Eyes:
@@ -46,24 +38,25 @@ class Eyes:
     The visual perception system of Genesis.
 
     Opens the laptop's webcam and observes the world. Generates
-    mathematical embeddings of what it sees using a lightweight
-    CLIP vision model.
+    embeddings using the from-scratch VisualCortex — NOT a pretrained
+    model. Genesis starts blind and learns to see.
     """
 
-    def __init__(self, camera_index: int = 0, image_size: Tuple[int, int] = (224, 224),
-                 motion_threshold: float = 0.05):
+    def __init__(self, camera_index: int = 0, image_size: Tuple[int, int] = (64, 64),
+                 motion_threshold: float = 0.05, visual_cortex=None):
         self.camera_index = camera_index
         self.image_size = image_size
         self.motion_threshold = motion_threshold
+        self._visual_cortex = visual_cortex  # Injected from GenesisMind
 
         self._camera = None
-        self._clip_model = None
-        self._clip_preprocess = None
-        self._tokenizer = None
         self._last_frame = None
-        self._device = "cpu"  # Always CPU — we don't need a GPU for perception
 
         logger.info("Eyes initialized (camera_index=%d, size=%s)", camera_index, image_size)
+
+    def set_visual_cortex(self, cortex):
+        """Set the visual cortex reference (for late binding)."""
+        self._visual_cortex = cortex
 
     def open(self):
         """Open the eyes — activate the webcam."""
@@ -84,35 +77,11 @@ class Eyes:
             self._camera = None
             logger.info("Eyes closed")
 
-    def _load_clip_model(self):
-        """Lazy-load the CLIP vision model (only when first needed)."""
-        if self._clip_model is not None:
-            return
-
-        logger.info("Loading vision model (CLIP ViT-B/32) onto CPU...")
-        import open_clip
-        import torch
-
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            "ViT-B-32", pretrained="laion2b_s34b_b79k", device=self._device
-        )
-        model.eval()
-        self._clip_model = model
-        self._clip_preprocess = preprocess
-        self._tokenizer = open_clip.get_tokenizer("ViT-B-32")
-        logger.info("Vision model loaded successfully")
-
     def _compute_motion(self, frame: np.ndarray) -> float:
-        """
-        Compute how much the visual field has changed since the last frame.
-
-        Returns a float between 0 (identical) and 1 (completely different).
-        This prevents the system from processing identical frames and wasting CPU.
-        """
+        """Compute how much the visual field has changed since last frame."""
         if self._last_frame is None:
-            return 1.0  # First frame is always significant
+            return 1.0
 
-        # Convert to grayscale and compute absolute difference
         import cv2
         gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
         gray_previous = cv2.cvtColor(self._last_frame, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
@@ -120,12 +89,7 @@ class Eyes:
         return float(diff)
 
     def look(self) -> Optional[VisualPercept]:
-        """
-        Take a single look at the world.
-
-        Captures a frame from the webcam, checks if anything meaningful
-        has changed, and if so, returns a VisualPercept with the image data.
-        """
+        """Take a single look at the world."""
         import cv2
 
         if self._camera is None:
@@ -136,10 +100,8 @@ class Eyes:
             logger.warning("Failed to capture frame from camera")
             return None
 
-        # Resize for processing
         frame_resized = cv2.resize(frame, self.image_size)
 
-        # Check motion
         motion = self._compute_motion(frame_resized)
         is_significant = motion > self.motion_threshold
 
@@ -152,56 +114,38 @@ class Eyes:
         self._last_frame = frame_resized.copy()
         return percept
 
-    def embed(self, percept: VisualPercept) -> np.ndarray:
+    def embed(self, percept: VisualPercept, train: bool = True) -> np.ndarray:
         """
-        Convert what the eyes see into a mathematical representation.
+        Convert what the eyes see into a 64-dim vector using the
+        from-scratch VisualCortex (Conv2D autoencoder).
 
-        This embedding is a 512-dimensional vector that captures the
-        *essence* of the image — what objects are in it, their shapes,
-        colors, and spatial relationships.
-
-        Two images of the same object will have similar embeddings,
-        even if taken from different angles or lighting conditions.
+        Unlike CLIP (which was pretrained on billions of image-text pairs),
+        this embedding is learned from scratch through self-supervised
+        reconstruction. Initially random — improves with experience.
         """
-        import torch
-        from PIL import Image
+        if self._visual_cortex is None:
+            logger.warning("No visual cortex connected — returning zero embedding")
+            return np.zeros(64, dtype=np.float32)
 
-        self._load_clip_model()
+        # Convert BGR → RGB for the cortex
+        image_rgb = percept.image[:, :, ::-1].copy()  # BGR -> RGB
+        embedding = self._visual_cortex.see(image_rgb, train=train)
+        percept.embedding = embedding
+        return embedding
 
-        # Convert BGR numpy array to PIL Image
-        image_rgb = percept.image[:, :, ::-1]  # BGR -> RGB
-        pil_image = Image.fromarray(image_rgb)
-
-        # Preprocess and compute embedding
-        image_tensor = self._clip_preprocess(pil_image).unsqueeze(0).to(self._device)
-
-        with torch.no_grad():
-            embedding = self._clip_model.encode_image(image_tensor)
-            embedding = embedding / embedding.norm(dim=-1, keepdim=True)  # Normalize
-
-        percept.embedding = embedding.cpu().numpy().flatten()
-        return percept.embedding
-
-    def embed_text(self, text: str) -> np.ndarray:
-        """
-        Convert a word/phrase into the same embedding space as images.
-
-        This is the key to multimodal binding: the text "dog" and an
-        image of a dog will have similar embeddings in CLIP space.
-        """
-        import torch
-
-        self._load_clip_model()
-
-        tokens = self._tokenizer([text]).to(self._device)
-        with torch.no_grad():
-            text_embedding = self._clip_model.encode_text(tokens)
-            text_embedding = text_embedding / text_embedding.norm(dim=-1, keepdim=True)
-
-        return text_embedding.cpu().numpy().flatten()
+    def embed_image(self, image: np.ndarray, train: bool = True) -> np.ndarray:
+        """Embed a raw image array (for teaching without VisualPercept)."""
+        if self._visual_cortex is None:
+            return np.zeros(64, dtype=np.float32)
+        
+        if image.shape[2] == 3 and len(image.shape) == 3:
+            image_rgb = image[:, :, ::-1].copy()  # Assume BGR → RGB
+        else:
+            image_rgb = image
+        return self._visual_cortex.see(image_rgb, train=train)
 
     def show_preview(self, duration_sec: float = 10.0):
-        """Show a live preview of what the eyes see (for debugging/demo)."""
+        """Show a live preview of what the eyes see."""
         import cv2
 
         if self._camera is None:
@@ -229,18 +173,20 @@ class Eyes:
 
 
 # =============================================================================
-# Standalone test — run with: python -m genesis.senses.eyes
+# Standalone test
 # =============================================================================
 if __name__ == "__main__":
+    from genesis.neural.visual_cortex import VisualCortex
+
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
     print("=" * 60)
-    print("Genesis Mind — Eyes Test")
-    print("Opening camera... Press 'q' to stop.")
+    print("Genesis Mind — Eyes Test (V8: From-Scratch Vision)")
     print("=" * 60)
 
-    with Eyes() as eyes:
-        eyes.show_preview(duration_sec=30.0)
-        print("\nTaking a snapshot and computing embedding...")
+    cortex = VisualCortex()
+    with Eyes(visual_cortex=cortex) as eyes:
+        eyes.show_preview(duration_sec=5.0)
+        print("\nTaking a snapshot...")
         percept = eyes.look()
         if percept:
             embedding = eyes.embed(percept)
@@ -248,6 +194,5 @@ if __name__ == "__main__":
             print(f"  Embedding shape: {embedding.shape}")
             print(f"  Embedding norm: {np.linalg.norm(embedding):.4f}")
             print(f"  Motion score: {percept.motion_score:.4f}")
+            print(f"  Visual cortex stats: {cortex.get_stats()}")
             print("Eyes test PASSED ✓")
-        else:
-            print("ERROR: Could not capture frame!")

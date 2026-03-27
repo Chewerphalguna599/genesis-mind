@@ -37,9 +37,9 @@ class Subconscious:
     The Society of Mind — all neural layers orchestrated.
 
     This is the complete subconscious pipeline sitting ON TOP of
-    pre-trained evolutionary hardware (Whisper & CLIP):
+    from-scratch neural hardware (VisualCortex & PhonemeEmbedder):
 
-        1. Evolutionary Hardware: CLIP (512-dim) & Whisper Text (384-dim)
+        1. Sensory Input: VisualCortex (64-dim) & Phoneme Embedding (64-dim)
         2. Limbic System:    embeddings  → neurochemical instinct
         3. Binding Network:  vis + aud   → 64-dim unified concept
         4. Personality Net:  concept + limbic + context → response
@@ -72,7 +72,7 @@ class Subconscious:
 
         # Meta-Controller: Neural Router (the Thalamus)
         self.meta_controller = MetaController(
-            input_dim=896,  # 512 CLIP + 384 text
+            input_dim=128,  # 64 visual + 64 auditory (from scratch)
             num_modules=4,
             hidden_dim=64,
             lr=0.0003,
@@ -96,7 +96,7 @@ class Subconscious:
         logger.info("  Layer 3: Personality (%d)", sum(p.numel() for p in self.personality.network.parameters()))
         logger.info("  Layer 4: World Model (%d)", sum(p.numel() for p in self.world_model.network.parameters()))
         logger.info("  Router:  Meta-Controller (%d)", sum(p.numel() for p in self.meta_controller.network.parameters()))
-        logger.info("  Using CLIP (512) and Text Embeddings (384) as pre-trained hardware.")
+        logger.info("  All weights learned from scratch — ZERO pretrained models.")
         logger.info("═══════════════════════════════════════════════════")
 
     def process_experience(self,
@@ -118,8 +118,8 @@ class Subconscious:
         """
         result = {}
 
-        visual_latent = clip_embedding if clip_embedding is not None else np.zeros(512, dtype=np.float32)
-        auditory_latent = text_embedding if text_embedding is not None else np.zeros(384, dtype=np.float32)
+        visual_latent = clip_embedding if clip_embedding is not None else np.zeros(64, dtype=np.float32)
+        auditory_latent = text_embedding if text_embedding is not None else np.zeros(64, dtype=np.float32)
 
         # ─── Meta-Controller: Compute routing weights ──────────
         routing = self.meta_controller.route(visual_latent, auditory_latent)

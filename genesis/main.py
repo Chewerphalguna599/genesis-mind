@@ -94,10 +94,7 @@ class GenesisMind:
 
         # --- Initialize Cortex ---
         self.reasoning = ReasoningEngine(
-            model=self.config.cortex.llm_model,
-            host=self.config.cortex.llm_host,
-            temperature=self.config.cortex.temperature,
-            max_tokens=self.config.cortex.max_response_tokens,
+            storage_path=GENESIS_HOME / "neural_weights" / "reasoner.pt",
         )
         self.associations = AssociationEngine()
         self.emotions = EmotionsEngine()
@@ -110,7 +107,7 @@ class GenesisMind:
 
         # --- V2: Grammar Engine (dual mode) ---
         self.grammar = GrammarEngine(
-            mode=self.config.cortex.grammar_mode,
+            mode="tabula_rasa",
             ngram_storage_path=MEMORY_DIR / "ngram_model.json",
         )
 
@@ -219,7 +216,6 @@ class GenesisMind:
                 sample_rate=self.config.senses.sample_rate,
                 chunk_duration_sec=self.config.senses.chunk_duration_sec,
                 silence_threshold=self.config.senses.silence_threshold,
-                whisper_model_name=self.config.senses.whisper_model,
             )
         return self._ears_instance
 
@@ -254,7 +250,6 @@ class GenesisMind:
             word=word,
             visual_embedding=visual_embedding,
             context=f"Taught by {self.axioms.creator_name}",
-            clip_text_embedding_fn=self._get_eyes().embed_text if visual_embedding is not None else None,
         )
 
         # Neurochemistry: learning rate modifier from chemical state
@@ -334,9 +329,8 @@ class GenesisMind:
         self.joint_attention.bind(word, word)
 
         # V3: Neural cascade — train ALL subconscious networks on this experience
-        # We now use the "Evolutionary Hardware" (CLIP + Text embeddings) as input
-        visual_tensor = visual_embedding.astype(np.float32) if visual_embedding is not None else np.zeros(512, dtype=np.float32)
-        audio_tensor = np.array(text_embedding, dtype=np.float32) if text_embedding else np.zeros(384, dtype=np.float32)
+        visual_tensor = visual_embedding.astype(np.float32) if visual_embedding is not None else np.zeros(64, dtype=np.float32)
+        audio_tensor = np.array(text_embedding, dtype=np.float32) if text_embedding else np.zeros(64, dtype=np.float32)
         
         # V4: Pass proprioceptive context vector to the neural cascade
         context_vec = self.proprioception.get_context_vector()
@@ -489,38 +483,59 @@ class GenesisMind:
                     memories.append(f"Associated concept: {concept_word} (activation: {strength:.2f})")
 
         narrative = self.episodic_memory.get_narrative(n=3)
-        identity_prompt = self.consciousness.get_identity_prompt()
-        moral_context = self.axioms.get_moral_context()
 
-        # Add neurochemistry context
-        neuro_context = self.neurochemistry.get_emotional_summary()
-        identity_prompt += f"\n{neuro_context}"
+        # V8: Neural reasoning — no LLM, use attention-based pattern matching
+        context_vec = self.consciousness.get_state_vector() if hasattr(self, 'consciousness') else None
+        
+        # Get memory embeddings for the neural reasoner
+        memory_embeddings = []
+        for mem in recalled:
+            if mem.get("embedding"):
+                memory_embeddings.append(np.array(mem["embedding"], dtype=np.float32))
 
-        # Generate response using grammar engine (respects mode)
-        response = self.grammar.generate_response(
-            context=question,
-            reasoning_engine=self.reasoning,
-            identity=identity_prompt,
-            moral_context=moral_context,
+        # Text embedding for the question
+        text_emb_arr = np.array(text_emb, dtype=np.float32)
+        
+        thought = self.reasoning.think(
+            auditory_embedding=text_emb_arr,
+            context_vector=context_vec,
+            memory_embeddings=memory_embeddings if memory_embeddings else None,
             phase=self.development.current_phase,
-            phase_name=self.development.current_phase_name,
-            memories=memories,
-            babbling_engine=self.babbling_engine,
-            joint_attention=self.joint_attention,
         )
 
+        # Decode thought vector through ResponseDecoder
+        if thought.raw_embedding is not None:
+            decoded = self.subconscious.decode_response(
+                thought.raw_embedding, self.semantic_memory
+            )
+            if decoded:
+                thought.content = decoded
+
+        # V7: Use neural babbling for response if no concepts decoded
+        if not thought.content:
+            response = self.grammar.generate_response(
+                context=question,
+                reasoning_engine=self.reasoning,
+                phase=self.development.current_phase,
+                phase_name=self.development.current_phase_name,
+                memories=memories,
+                babbling_engine=self.babbling_engine,
+                joint_attention=self.joint_attention,
+            )
+        else:
+            response = thought.content
+
         # V7: Generate neural audio response through acoustic pipeline
-        if self.config.cortex.grammar_mode == "tabula_rasa":
-            try:
-                waveform, neural_tokens = self.sensorimotor.generate_spontaneous(
-                    max_tokens=40, temperature=0.85,
-                )
-                if len(waveform) > 1600:  # At least 0.1s of audio
-                    self.sensorimotor.vocoder.play(waveform)
-                    logger.debug("Neural vocalization: %d tokens → %d samples",
-                                 len(neural_tokens), len(waveform))
-            except Exception as e:
-                logger.error("Neural audio generation failed: %s", e)
+        try:
+            waveform, neural_tokens = self.sensorimotor.generate_spontaneous(
+                max_tokens=40, temperature=0.85,
+            )
+            if len(waveform) > 1600:  # At least 0.1s of audio
+                self.sensorimotor.vocoder.play(waveform)
+                logger.debug("Neural vocalization: %d tokens → %d samples",
+                             len(neural_tokens), len(waveform))
+        except Exception as e:
+            logger.error("Neural audio generation failed: %s", e)
 
         # Evaluate emotional content
         evaluation = self.emotions.evaluate(question)
@@ -1273,19 +1288,20 @@ class GenesisMind:
         elif perception.type == PerceptionType.THOUGHT:
             # Spontaneous inner monologue
             if self.development.has_capability("reason"):
-                identity = self.consciousness.get_identity_prompt()
-                neuro_state = self.neurochemistry.get_emotional_summary()
+                # V8: Neural reasoning — no LLM
+                context_vec = self.consciousness.get_state_vector() if hasattr(self, 'consciousness') else None
                 thought = self.reasoning.think(
-                    sensory_input="",
-                    memories=[],
-                    recent_narrative=self.episodic_memory.get_narrative(n=2),
-                    identity=identity + "\n" + neuro_state,
-                    moral_context=self.axioms.get_moral_context(),
+                    context_vector=context_vec,
                     phase=self.development.current_phase,
-                    phase_name=self.development.current_phase_name,
-                    question="Reflect on your recent experiences. What are you thinking about?",
                 )
-                print(f"\n  Genesis: 💭 {thought.content}")
+                if thought.raw_embedding is not None:
+                    decoded = self.subconscious.decode_response(
+                        thought.raw_embedding, self.semantic_memory
+                    )
+                    if decoded:
+                        thought.content = decoded
+                if thought.content:
+                    print(f"\n  Genesis: 💭 {thought.content}")
 
 
 # =============================================================================
@@ -1299,7 +1315,6 @@ if __name__ == "__main__":
     )
 
     logging.getLogger("chromadb").setLevel(logging.WARNING)
-    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 

@@ -52,11 +52,11 @@ class RouterNetwork(nn.Module):
     for each sub-network in the cascade.
     """
 
-    def __init__(self, input_dim: int = 896, num_modules: int = 4, hidden_dim: int = 64):
+    def __init__(self, input_dim: int = 128, num_modules: int = 4, hidden_dim: int = 64):
         """
         Args:
-            input_dim: Concatenated sensory features (512 CLIP + 384 text = 896)
-            num_modules: Number of sub-networks to route between (4: limbic, binding, personality, world_model)
+            input_dim: Concatenated sensory features (64 visual + 64 auditory = 128)
+            num_modules: Number of sub-networks to route between
             hidden_dim: Internal representation size
         """
         super().__init__()
@@ -102,7 +102,7 @@ class MetaController:
 
     MODULE_NAMES = ["limbic", "binding", "personality", "world_model"]
 
-    def __init__(self, input_dim: int = 896, num_modules: int = 4,
+    def __init__(self, input_dim: int = 128, num_modules: int = 4,
                  hidden_dim: int = 64, lr: float = 0.0003):
         self.input_dim = input_dim
         self.num_modules = num_modules
@@ -128,8 +128,8 @@ class MetaController:
         Compute routing weights for the current input.
         
         Args:
-            visual_embedding: 512-dim CLIP embedding
-            text_embedding: 384-dim text embedding
+            visual_embedding: 64-dim visual embedding
+            text_embedding: 64-dim phoneme embedding
             
         Returns:
             Dict mapping module name → routing weight (0-1, sums to 1)

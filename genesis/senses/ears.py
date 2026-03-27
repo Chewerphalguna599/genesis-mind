@@ -1,16 +1,15 @@
 """
-Genesis Mind — The Ears
+Genesis Mind — The Ears (V8: No Pretrained Models)
 
-The auditory perception system. This is how Genesis hears the world.
+The auditory perception system. Opens the microphone, captures audio,
+and processes it through the from-scratch auditory cortex.
 
-It opens the laptop microphone, listens for speech, and transcribes
-what it hears into text. It also decomposes spoken words into their
-constituent phonemes — the smallest units of sound — which are then
-used by the phonetics module to learn letter↔sound mappings.
+V8 CHANGE: Removed OpenAI Whisper (39M pretrained params).
+Audio is now processed as raw mel spectrograms → VQ codebook → acoustic
+tokens. Genesis does NOT transcribe audio to text. It hears raw sound
+patterns and learns to associate them with concepts through experience.
 
-Like a newborn's ears — it hears everything but interprets nothing.
-Meaning comes later, when the cortex connects what it hears to what
-it sees and what it is taught.
+This is how a real infant hears — raw acoustic streams, not words.
 """
 
 import time
@@ -31,65 +30,87 @@ class AuditoryPercept:
     """
     A single moment of hearing.
 
-    Contains the transcribed text, raw audio data, and metadata
-    about the speech event.
+    Contains raw audio data and acoustic tokens (NOT text).
+    Text transcription is gone — Genesis hears raw sound patterns.
     """
-    text: str = ""                          # Transcribed speech
     raw_audio: Optional[np.ndarray] = None  # Raw audio waveform
+    mel_spectrogram: Optional[np.ndarray] = None  # Mel spectrogram
+    acoustic_tokens: Optional[List[int]] = None   # VQ codebook indices
+    acoustic_embedding: Optional[np.ndarray] = None  # 64-dim embedding
     sample_rate: int = 16000
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    duration_sec: float = 0.0               # Duration of the audio chunk
-    energy: float = 0.0                     # RMS energy of the audio
-    is_speech: bool = False                 # Whether speech was detected
-    words: List[str] = field(default_factory=list)  # Individual words
+    duration_sec: float = 0.0
+    energy: float = 0.0
+    is_speech: bool = False
+    # text field kept for backward compat with CLI, but populated only
+    # through acoustic pattern matching, not transcription
+    text: str = ""
+    words: List[str] = field(default_factory=list)
 
 
 class Ears:
     """
     The auditory perception system of Genesis.
 
-    Opens the laptop's microphone and listens to the world. Uses
-    OpenAI's Whisper (tiny model, 39M params) running on CPU to
-    transcribe speech into text.
+    V8: No Whisper. Processes raw audio as mel spectrograms and acoustic
+    tokens. Genesis hears sound patterns, not English words.
     """
 
     def __init__(self, sample_rate: int = 16000, chunk_duration_sec: float = 3.0,
-                 silence_threshold: float = 0.01, whisper_model_name: str = "tiny"):
+                 silence_threshold: float = 0.01, auditory_cortex=None,
+                 **kwargs):  # Accept and ignore whisper_model_name for compat
         self.sample_rate = sample_rate
         self.chunk_duration_sec = chunk_duration_sec
         self.silence_threshold = silence_threshold
-        self.whisper_model_name = whisper_model_name
+        self._auditory_cortex = auditory_cortex
 
-        self._whisper_model = None
         self._listening = False
         self._audio_queue: queue.Queue = queue.Queue()
         self._listen_thread: Optional[threading.Thread] = None
 
         logger.info(
-            "Ears initialized (rate=%dHz, chunk=%.1fs, whisper=%s)",
-            sample_rate, chunk_duration_sec, whisper_model_name,
+            "Ears initialized (rate=%dHz, chunk=%.1fs, from-scratch)",
+            sample_rate, chunk_duration_sec,
         )
 
-    def _load_whisper(self):
-        """Lazy-load the Whisper speech-to-text model."""
-        if self._whisper_model is not None:
-            return
-
-        logger.info("Loading speech model (Whisper %s) onto CPU...", self.whisper_model_name)
-        import whisper
-        self._whisper_model = whisper.load_model(self.whisper_model_name, device="cpu")
-        logger.info("Speech model loaded successfully")
+    def set_auditory_cortex(self, cortex):
+        """Set the auditory cortex reference (for late binding)."""
+        self._auditory_cortex = cortex
 
     def _compute_energy(self, audio: np.ndarray) -> float:
         """Compute the RMS energy of an audio chunk."""
         return float(np.sqrt(np.mean(audio.astype(np.float32) ** 2)))
 
+    def _compute_mel_spectrogram(self, audio: np.ndarray) -> np.ndarray:
+        """
+        Compute a mel spectrogram from raw audio — NO pretrained models.
+        
+        This is pure signal processing (FFT + mel filterbank), not learned.
+        """
+        import torch
+        import torchaudio.transforms as T
+
+        waveform = torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
+        
+        mel_transform = T.MelSpectrogram(
+            sample_rate=self.sample_rate,
+            n_fft=400,
+            hop_length=160,
+            n_mels=64,
+        )
+        mel = mel_transform(waveform)
+        
+        # Log scale for better dynamic range
+        mel = torch.log(mel + 1e-9)
+        
+        return mel.squeeze(0).numpy()
+
     def listen_once(self, duration_sec: float = None) -> Optional[AuditoryPercept]:
         """
         Listen for a fixed duration and return what was heard.
-
-        This is the simplest way to hear — open the microphone,
-        record for `duration_sec` seconds, then process the audio.
+        
+        Returns raw audio + mel spectrogram + acoustic tokens.
+        NO text transcription — Genesis hears patterns, not words.
         """
         import sounddevice as sd
 
@@ -97,17 +118,15 @@ class Ears:
         logger.debug("Listening for %.1f seconds...", duration)
 
         try:
-            # Record audio
             audio = sd.rec(
                 int(duration * self.sample_rate),
                 samplerate=self.sample_rate,
                 channels=1,
                 dtype="float32",
             )
-            sd.wait()  # Wait for recording to complete
+            sd.wait()
             audio = audio.flatten()
 
-            # Check energy level
             energy = self._compute_energy(audio)
             is_speech = energy > self.silence_threshold
 
@@ -119,9 +138,30 @@ class Ears:
                 is_speech=is_speech,
             )
 
-            # Only transcribe if speech was detected (save CPU)
             if is_speech:
-                percept = self.transcribe(percept)
+                # Compute mel spectrogram (pure signal processing, not pretrained)
+                try:
+                    percept.mel_spectrogram = self._compute_mel_spectrogram(audio)
+                except Exception as e:
+                    logger.debug("Mel computation failed: %s", e)
+
+                # If auditory cortex is available, get acoustic embedding
+                if self._auditory_cortex is not None:
+                    try:
+                        result = self._auditory_cortex.process_audio(audio)
+                        if result:
+                            percept.acoustic_embedding = result.get("embedding")
+                            percept.acoustic_tokens = result.get("tokens")
+                    except Exception as e:
+                        logger.debug("Auditory cortex processing failed: %s", e)
+
+                # For backward compatibility with CLI: represent acoustic
+                # content as a simple energy/pattern descriptor
+                if percept.acoustic_tokens:
+                    token_str = "-".join(str(t) for t in percept.acoustic_tokens[:8])
+                    percept.text = f"[acoustic:{token_str}]"
+                elif is_speech:
+                    percept.text = f"[sound:e={energy:.3f}]"
 
             return percept
 
@@ -129,59 +169,9 @@ class Ears:
             logger.error("Failed to capture audio: %s", e)
             return None
 
-    def transcribe(self, percept: AuditoryPercept) -> AuditoryPercept:
-        """
-        Transcribe the audio in a percept using Whisper.
-
-        Takes the raw audio waveform and converts it to text.
-        This is the moment where sound becomes language.
-        """
-        self._load_whisper()
-
-        if percept.raw_audio is None:
-            return percept
-
-        try:
-            # Whisper expects float32 audio normalized to [-1, 1]
-            audio = percept.raw_audio.astype(np.float32)
-
-            # Pad or trim to 30 seconds (Whisper's expected input length)
-            import whisper
-            audio_padded = whisper.pad_or_trim(audio)
-
-            # Compute log-Mel spectrogram
-            mel = whisper.log_mel_spectrogram(audio_padded).to("cpu")
-
-            # Decode
-            options = whisper.DecodingOptions(language="en", fp16=False)
-            result = whisper.decode(self._whisper_model, mel, options)
-
-            # Clean up the transcription
-            text = result.text.strip()
-            if text and text.lower() not in ["", "you", "(silence)", "[silence]",
-                                               "thank you.", "thanks for watching!"]:
-                percept.text = text
-                percept.words = text.split()
-                logger.info("Heard: '%s'", text)
-            else:
-                percept.text = ""
-                percept.is_speech = False
-
-        except Exception as e:
-            logger.error("Transcription failed: %s", e)
-
-        return percept
-
     def start_continuous_listening(self, callback: Callable[[AuditoryPercept], None]):
-        """
-        Start listening continuously in a background thread.
-
-        Every time speech is detected, the callback is invoked with
-        the AuditoryPercept. This allows the consciousness loop to
-        react to speech in real-time.
-        """
+        """Start listening continuously in a background thread."""
         if self._listening:
-            logger.warning("Already listening continuously")
             return
 
         self._listening = True
@@ -190,7 +180,7 @@ class Ears:
             logger.info("Continuous listening started")
             while self._listening:
                 percept = self.listen_once()
-                if percept and percept.is_speech and percept.text:
+                if percept and percept.is_speech:
                     callback(percept)
 
         self._listen_thread = threading.Thread(target=_listen_loop, daemon=True)
@@ -212,26 +202,22 @@ class Ears:
 
 
 # =============================================================================
-# Standalone test — run with: python -m genesis.senses.ears
+# Standalone test
 # =============================================================================
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
     print("=" * 60)
-    print("Genesis Mind — Ears Test")
-    print("Speak into your microphone...")
+    print("Genesis Mind — Ears Test (V8: No Whisper)")
     print("=" * 60)
 
     with Ears() as ears:
         for i in range(3):
             print(f"\n--- Listening ({i+1}/3) ---")
-            percept = ears.listen_once(duration_sec=4.0)
+            percept = ears.listen_once(duration_sec=3.0)
             if percept:
                 print(f"  Energy: {percept.energy:.4f}")
                 print(f"  Speech detected: {percept.is_speech}")
-                if percept.text:
-                    print(f"  Transcription: '{percept.text}'")
-                    print(f"  Words: {percept.words}")
-            else:
-                print("  ERROR: Could not capture audio")
-
-    print("\nEars test COMPLETE ✓")
+                if percept.mel_spectrogram is not None:
+                    print(f"  Mel shape: {percept.mel_spectrogram.shape}")
+                if percept.acoustic_tokens:
+                    print(f"  Acoustic tokens: {percept.acoustic_tokens[:8]}")

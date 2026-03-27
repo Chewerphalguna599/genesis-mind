@@ -1,33 +1,27 @@
 # =============================================================================
-# Genesis Mind — Dependencies
+# Genesis Mind — Dependencies (V8: Zero Pretrained Models)
 # =============================================================================
-# All packages are chosen for CPU-only operation on a laptop.
-# No CUDA, no GPU drivers, no cloud APIs required.
+# All models are from scratch. No CLIP, no Whisper, no SBERT, no Ollama.
+# No CUDA, no GPU drivers, no cloud APIs, no internet required.
 # =============================================================================
+
+# --- Core Neural Framework ---
+torch>=2.1.0                   # Backend for all from-scratch neural networks
+torchaudio>=2.1.0              # Mel spectrogram computation (pure signal processing)
+numpy>=1.24.0                  # Numerical backbone for all sensory data
 
 # --- Perception (Senses) ---
 opencv-python>=4.8.0           # Eyes: webcam capture and image processing
 sounddevice>=0.4.6             # Ears: microphone audio capture
-numpy>=1.24.0                  # Numerical backbone for all sensory data
 Pillow>=10.0.0                 # Image manipulation and format conversion
-
-# --- Speech & Language ---
-openai-whisper>=20231117       # Ears: speech-to-text (tiny model, ~39M params)
-torch>=2.1.0                   # Backend for Whisper and embedding models (CPU)
-torchaudio>=2.1.0              # Audio processing for Whisper
-
-# --- Embeddings & Vision ---
-sentence-transformers>=2.2.0   # Text embeddings (all-MiniLM-L6-v2, ~22M params)
-open-clip-torch>=2.20.0        # Visual embeddings (ViT-B/32, ~88M params)
 
 # --- Memory (Vector Database) ---
 chromadb>=0.4.0                # Local vector database, no server needed
 
-# --- Reasoning (Local LLM) ---
-ollama>=0.1.0                  # Client for local LLM (phi3:mini or llama3.2:1b)
+# --- Voice ---
+pyttsx3>=2.90                  # Text-to-speech (offline)
 
 # --- Utilities ---
-pyttsx3>=2.90                  # Text-to-speech (the AI's voice, offline)
 scipy>=1.11.0                  # Signal processing for audio
 flask==3.1.0
 flask-cors==5.0.0

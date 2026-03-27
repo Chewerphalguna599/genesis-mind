@@ -491,7 +491,7 @@ class BrainDaemon:
         Always-on camera — Genesis continuously sees the world.
 
         Opens the camera, captures frames, detects motion, and processes
-        significant visual changes through CLIP and the neural cascade.
+        significant visual changes through the VisualCortex and neural cascade.
         Unknown objects trigger curiosity questions.
         """
         try:
@@ -509,11 +509,11 @@ class BrainDaemon:
             if not percept.is_significant:
                 return
 
-            # Embed what we see through CLIP
+            # Embed what we see through the VisualCortex
             try:
                 embedding = eyes.embed(percept)
             except Exception as e:
-                logger.debug("[vision] CLIP embed failed: %s", e)
+                logger.debug("[vision] Visual cortex embed failed: %s", e)
                 return
 
             # Process through neural cascade (the brain "sees")
@@ -552,7 +552,7 @@ class BrainDaemon:
         Always-on microphone — Genesis continuously hears the world.
 
         Blocks its own thread to listen for a chunk of audio, transcribes it 
-        via Whisper, runs it through the attention filter, and if it's salient, 
+        via the auditory cortex, runs it through the attention filter, and if it's salient, 
         absorbs it into working memory and the neural cascade.
         """
         try:
