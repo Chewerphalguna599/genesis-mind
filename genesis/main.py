@@ -1145,7 +1145,9 @@ class GenesisMind:
                 self.shutdown()
                 break
             except Exception as e:
+                import traceback
                 logger.error("Error in interactive loop: %s", e)
+                logger.error("Traceback:\n%s", traceback.format_exc())
                 print(f"  [Error: {e}]")
 
     # =========================================================================

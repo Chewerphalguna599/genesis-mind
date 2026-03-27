@@ -30,7 +30,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from genesis.neural.device import DEVICE, strip_compile_prefix, to_device
+from genesis.neural.device import DEVICE, get_state_dict_safe, strip_compile_prefix, to_device
 
 logger = logging.getLogger("genesis.neural.limbic_system")
 
@@ -180,7 +180,7 @@ class LimbicSystem:
     def save_weights(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         torch.save({
-            'state_dict': self.network.state_dict(),
+            'state_dict': get_state_dict_safe(self.network),
             'reactions': self._reactions,
             'training_steps': self._training_steps,
             'total_loss': self._total_loss,

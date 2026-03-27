@@ -148,13 +148,16 @@ class DashboardServer:
                         activations['vq_usage'] = usage[:256]
 
             # Growth stats
-            activations['total_params'] = mind.subconscious.get_total_params()
-            if hasattr(mind, 'sensorimotor') and mind.sensorimotor:
-                activations['total_params'] += sum(
-                    p.numel() for p in mind.sensorimotor.auditory_cortex.encoder.parameters()
-                ) + sum(
-                    p.numel() for p in mind.sensorimotor.acoustic_brain.model.parameters()
-                )
+            try:
+                activations['total_params'] = mind.subconscious.get_total_params()
+                if hasattr(mind, 'sensorimotor') and mind.sensorimotor:
+                    activations['total_params'] += sum(
+                        p.numel() for p in mind.sensorimotor.auditory_cortex.encoder.parameters()
+                    ) + sum(
+                        p.numel() for p in mind.sensorimotor.acoustic_brain.model.parameters()
+                    )
+            except Exception:
+                activations['total_params'] = -1  # Param counting failed (torch.compile wrapper)
 
             # Sensory buffers (co-occurrence state)
             if hasattr(mind, '_brain') and mind._brain:

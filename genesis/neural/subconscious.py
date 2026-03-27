@@ -76,12 +76,14 @@ class Subconscious:
         # Load existing weights BEFORE torch.compile
         self._load_all()
 
-        # ═══ torch.compile() on ALL networks ═══
+        # ═══ torch.compile() — ONLY for networks that DON'T grow ═══
+        # Personality, WorldModel, MetaController undergo neuroplasticity growth
+        # which replaces their sub-modules. torch.compile on MPS produces raw
+        # functions that break save/load after growth. Skip them — they're tiny
+        # (~20K params) so compilation adds negligible speedup anyway.
         self.limbic_system.network = try_compile(self.limbic_system.network, "LimbicNetwork")
         self.binding_network.network = try_compile(self.binding_network.network, "BindingNetwork")
-        self.personality.network = try_compile(self.personality.network, "PersonalityGRU")
-        self.world_model.network = try_compile(self.world_model.network, "WorldModel")
-        self.meta_controller.network = try_compile(self.meta_controller.network, "MetaController")
+        # personality, world_model, meta_controller: NOT compiled (growable)
 
         # Total params across all networks
         total_params = (

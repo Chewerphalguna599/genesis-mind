@@ -273,7 +273,8 @@ class Neuroplasticity:
 
         # ── Grow Personality GRU ──
         personality = subconscious.personality
-        pgru = personality.network  # PersonalityGRU
+        pgru = personality.network  # Raw nn.Module (not compiled — growable networks skip torch.compile)
+        
         if (target_hidden > pgru.hidden_dim or
                 target_gru_layers > pgru.num_layers):
 
@@ -310,7 +311,7 @@ class Neuroplasticity:
             # Resize hidden state
             personality._hidden_state = None  # Reset, will auto-create on next forward
 
-            # Rebuild optimizer
+            # Rebuild optimizer using the raw module's parameters
             personality.optimizer = torch.optim.Adam(
                 pgru.parameters(),
                 lr=personality.optimizer.param_groups[0]['lr']
@@ -325,7 +326,7 @@ class Neuroplasticity:
 
             # ── Grow World Model ──
             world_model = subconscious.world_model
-            wm = world_model.network
+            wm = world_model.network  # Raw nn.Module (not compiled)
             old_wm_hidden = world_model.hidden_dim
             if new_hidden > old_wm_hidden:
                 concept_dim = world_model.concept_dim
@@ -368,6 +369,16 @@ class Neuroplasticity:
                 "hidden": f"→ {target_mc}",
             }
             logger.info("  🧠 Meta-controller grew: hidden → %d", target_mc)
+
+        # ═══ Move grown networks to device ═══
+        # Growable networks are not torch.compile()'d — just ensure they're on device.
+        from genesis.neural.device import DEVICE as dev
+        if "personality" in report["changes"]:
+            subconscious.personality.network.to(dev)
+        if "world_model" in report["changes"]:
+            subconscious.world_model.network.to(dev)
+        if "meta_controller" in report["changes"]:
+            subconscious.meta_controller.network.to(dev)
 
         # Count params after
         params_after = subconscious.get_total_params()

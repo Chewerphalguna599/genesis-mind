@@ -20,7 +20,7 @@ import logging
 import json
 from pathlib import Path
 
-from genesis.neural.device import DEVICE, to_device, try_compile, get_autocast_context, strip_compile_prefix
+from genesis.neural.device import DEVICE, to_device, try_compile, get_autocast_context, strip_compile_prefix, get_state_dict_safe
 from typing import Optional, Tuple
 
 import numpy as np
@@ -275,8 +275,8 @@ class VisualCortex:
             return
         self._storage_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save({
-            "encoder": self.encoder.state_dict(),
-            "decoder": self.decoder.state_dict(),
+            "encoder": get_state_dict_safe(self.encoder),
+            "decoder": get_state_dict_safe(self.decoder),
             "optimizer": self.optimizer.state_dict(),
             "train_steps": self._train_steps,
             "total_loss": self._total_loss,
