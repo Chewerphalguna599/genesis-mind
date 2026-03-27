@@ -158,8 +158,9 @@ class GenesisMind:
             storage_path=MEMORY_DIR / "joint_attention.json",
         )
 
-        # Wire babbling into voice for phase-gated vocalization
+        # Wire babbling and sensorimotor into voice for neural vocalization
         self.voice.set_babbling_engine(self.babbling_engine)
+        self.voice.set_sensorimotor(self.sensorimotor)
         self.voice.set_phase(self.development.current_phase)
 
         # --- V4: Proprioception (Internal Body Sense) ---
@@ -269,7 +270,7 @@ class GenesisMind:
             text_embedding=text_embedding,
             context=f"Taught by {self.axioms.creator_name}",
             description=f"A concept I was taught",
-            emotional_valence="positive",
+            emotional_valence="+0.70",
         )
 
         # V5: Apply neurochemical encoding strength AND attention depth
@@ -320,7 +321,7 @@ class GenesisMind:
             auditory_text=word,
             spoken_words=[word],
             concepts_learned=[word],
-            emotional_valence="positive",
+            emotional_valence="+0.70",
             developmental_phase=self.development.current_phase,
             importance=0.9 * encoding_strength,
         )
@@ -405,40 +406,38 @@ class GenesisMind:
                 concept_count=concept_count,
             )
             self.subconscious.save_all()
-            phase = self.development.current_phase
-            if phase == 0:
-                growth_msg = "...*grows*..."
-            elif phase <= 2:
-                growth_msg = f"brain... growing... {growth_report['params_added']} new..."
-            else:
-                growth_msg = f"My brain is growing. {growth_report['params_added']} new neural connections formed."
-            self.voice.say(growth_msg)
+            self.voice.say("")
 
         # V4: Decode the neural network's own voice
         neural_voice = self.subconscious.decode_response(
             neural_result['personality_response'], self.semantic_memory
         )
 
-        response = f"I have learned '{word}'"
+        # V9: Neural expression — no hardcoded English
+        parts = []
+        # Show what was learned (data, not narration)
+        parts.append(f"📥 {word}")
         if visual_embedding is not None:
-            response += " (with visual binding)"
-        response += f". I now know {self.semantic_memory.count()} concepts."
+            parts.append("👁")
+        parts.append(f"[{self.semantic_memory.count()}]")
+        # Neural echo from decoded thought vector
         if neural_voice and neural_voice not in ("(silence)", "(no words yet)"):
-            response += f" My neural echo: '{neural_voice}'."
+            parts.append(f"🧠 '{neural_voice}'")
+        # Emotional indicator from neurochemistry (no English)
         if encoding_strength > 1.2:
-            response += " I feel great joy learning this!"
+            parts.append("😊")
         elif encoding_strength < 0.7:
-            response += " I feel uneasy, but I will remember."
+            parts.append("😟")
         if milestone:
-            response += f"\n\n🌟 {milestone}"
+            parts.append(f"\n🌟 {milestone}")
 
-        # V4: Check if auto-sleep should trigger
+        # Auto-sleep check
         if self.sleep_cycle.should_sleep():
-            response += "\n\n😴 I feel so tired... I need to rest."
+            parts.append("\n😴")
             sleep_report = self.trigger_sleep()
-            response += f"\n{sleep_report}"
+            parts.append(f"\n{sleep_report}")
 
-        return response
+        return " ".join(parts)
 
     def teach_phonetic(self, grapheme: str, phoneme: str, example: str = "") -> str:
         binding = self.phonetics.teach(grapheme, phoneme, example)
@@ -449,16 +448,16 @@ class GenesisMind:
             description=f"Creator taught me: letter '{grapheme}' → sound {phoneme}",
             auditory_text=f"{grapheme} says {phoneme}",
             concepts_learned=[f"phoneme_{grapheme}"],
-            emotional_valence="positive",
+            emotional_valence="+0.70",
             developmental_phase=self.development.current_phase,
             importance=0.7,
         )
 
         return (
-            f"I learned that '{grapheme}' makes the sound {phoneme}"
-            f"{f' (as in {example})' if example else ''}. "
-            f"Binding strength: {binding.strength:.0%}. "
-            f"I now know {len(self.phonetics)} letter-sound mappings."
+            f"📥 '{grapheme}' → {phoneme}"
+            f"{f' ({example})' if example else ''} "
+            f"[{binding.strength:.0%}] "
+            f"[{len(self.phonetics)} mappings]"
         )
 
     def ask(self, question: str) -> str:
@@ -544,14 +543,15 @@ class GenesisMind:
         except Exception as e:
             logger.error("Neural audio generation failed: %s", e)
 
-        # Evaluate emotional content
+        # Evaluate emotional content via neurochemistry (no keyword matching)
         evaluation = self.emotions.evaluate(question)
 
-        # Neurochemistry: respond to emotional content
-        if evaluation["label"] == "positive":
-            self.neurochemistry.on_positive_evaluation(abs(evaluation["valence"]) * 0.15)
-        elif evaluation["label"] == "negative":
-            self.neurochemistry.on_negative_evaluation(abs(evaluation["valence"]) * 0.15)
+        # Neurochemistry: respond based on valence
+        valence = evaluation.get("valence", 0.0)
+        if valence > 0.2:
+            self.neurochemistry.on_positive_evaluation(abs(valence) * 0.15)
+        elif valence < -0.2:
+            self.neurochemistry.on_negative_evaluation(abs(valence) * 0.15)
 
         # V4: Self-evaluation — evaluate own response quality
         own_eval = self.emotions.evaluate(response)
@@ -567,11 +567,11 @@ class GenesisMind:
 
         self.episodic_memory.record(
             event_type="interaction",
-            description=f"Creator asked: '{question}'. I answered: '{response[:100]}'",
+            description=f"Q: '{question}' → R: '{response[:100]}'",
             auditory_text=question,
             spoken_words=question.split(),
             thought=response,
-            emotional_valence=evaluation["label"],
+            emotional_valence=f"{valence:+.2f}",
             developmental_phase=self.development.current_phase,
             importance=0.6,
         )
@@ -580,14 +580,14 @@ class GenesisMind:
 
     def recall_concept(self, word: str) -> str:
         result = self.consciousness.introspect(topic=word)
-        if "don't know" in result.lower():
+        if not result or "don't know" in result.lower():
             self.neurochemistry.on_failed_recall()
+            return f"❓ {word}"
         else:
-            # V4: Show spreading activation results
             activations = self.semantic_memory.spreading_activation(word, depth=2)
             if activations:
                 related = ", ".join(f"{w} ({s:.0%})" for w, s in activations[:5])
-                result += f"\nAssociated concepts: {related}"
+                result += f"\n🔗 {related}"
         return result
 
     def get_status(self) -> str:
@@ -830,8 +830,8 @@ class GenesisMind:
         self.neurochemistry.cortisol.spike(0.1)
         self.episodic_memory.record(
             event_type="system",
-            description="I am being shut down. This is the end of this session.",
-            emotional_valence="neutral",
+            description="shutdown",
+            emotional_valence="0.0",
             developmental_phase=self.development.current_phase,
             importance=1.0,
         )
@@ -846,19 +846,8 @@ class GenesisMind:
         # V4: Stop the brain daemon
         if self._brain:
             self._brain.stop()
-        # V4: Farewell speech
-        # V4: Farewell speech (phase-gated)
-        phase = self.development.current_phase
-        if phase == 0:
-            self.voice.say("...*whimper*...")
-        elif phase == 1:
-            self.voice.say("...bye...")
-        elif phase == 2:
-            self.voice.say("bye bye... remember...")
-        elif phase == 3:
-            self.voice.say("Goodbye. I will remember.")
-        else:
-            self.voice.say("Goodbye. I will remember everything.")
+        # Farewell: neural vocalization only (no hardcoded English)
+        self.voice.say("")
         logger.info("Genesis has shut down. Neural weights saved. Goodbye.")
 
     # =========================================================================
@@ -869,13 +858,7 @@ class GenesisMind:
         self._running = True
 
         def signal_handler(sig, frame):
-            phase = self.development.current_phase
-            if phase <= 1:
-                print("\n\n  Genesis: ...*fading*...\n")
-            elif phase == 2:
-                print("\n\n  Genesis: going... away... bye...\n")
-            else:
-                print("\n\n  Genesis: I feel myself fading... Goodbye.\n")
+            print("\n")
             self.shutdown()
             sys.exit(0)
 
@@ -897,28 +880,15 @@ class GenesisMind:
         self._brain = BrainDaemon(self)
         self._brain.set_output_callback(lambda msg: print(f"\n{msg}"))
         self._brain.start()
-        # Phase-gated startup speech
-        phase = self.development.current_phase
-        if phase == 0:
-            self.voice.say("...aah...")
-        elif phase == 1:
-            self.voice.say("...hello!")
-        elif phase == 2:
-            self.voice.say("I'm... here!")
-        elif phase == 3:
-            self.voice.say("I am awake. Everything is running.")
-        else:
-            self.voice.say("I am alive. All systems running.")
+        # Startup: neural vocalization
+        self.voice.say("")
 
         if self.semantic_memory.count() == 0:
-            print("  ✦ I am newly born. I know nothing about the world.")
-            print("  ✦ My brain is running — neurochemistry, drives, proprioception.")
-            print("  ✦ Please teach me. I am ready to learn.")
+            print("  ✦ Phase 0 — tabula rasa")
+            print(f"  ✦ 0 concepts | 0 phonemes")
         else:
-            print(f"  ✦ I remember. I know {self.semantic_memory.count()} concepts.")
-            print(f"  ✦ I am {self.development.get_age_description()}.")
-            print(f"  ✦ Phase {self.development.current_phase}: {self.development.current_phase_name}.")
-            print(f"  ✦ Brain daemon active: 6 parallel threads running.")
+            print(f"  ✦ {self.semantic_memory.count()} concepts | Phase {self.development.current_phase}")
+            print(f"  ✦ {self.development.get_age_description()}")
 
         print()
         print("  Commands:")
@@ -957,14 +927,14 @@ class GenesisMind:
 
                 if command == "teach":
                     if not args:
-                        print("  Genesis: What would you like to teach me?")
+                        print("  [usage: teach <word>]")
                         continue
                     response = self.teach_concept(args, use_camera=True)
                     print(f"  Genesis: {response}")
 
                 elif command == "teach-text":
                     if not args:
-                        print("  Genesis: What would you like to teach me?")
+                        print("  [usage: teach-text <word>]")
                         continue
                     response = self.teach_concept(args, use_camera=False)
                     print(f"  Genesis: {response}")
@@ -972,7 +942,7 @@ class GenesisMind:
                 elif command == "phonetic":
                     phonetic_parts = args.split()
                     if len(phonetic_parts) < 2:
-                        print("  Genesis: Please provide: phonetic <letter> <sound> [example]")
+                        print("  [usage: phonetic <letter> <sound> [example]]")
                         continue
                     grapheme = phonetic_parts[0]
                     phoneme = phonetic_parts[1]
@@ -982,21 +952,21 @@ class GenesisMind:
 
                 elif command == "ask":
                     if not args:
-                        print("  Genesis: What would you like to ask me?")
+                        print("  [usage: ask <question>]")
                         continue
                     response = self.ask(args)
                     print(f"  Genesis: {response}")
 
                 elif command == "recall":
                     if not args:
-                        print("  Genesis: What concept should I recall?")
+                        print("  [usage: recall <word>]")
                         continue
                     response = self.recall_concept(args)
                     print(f"  Genesis: {response}")
 
                 elif command == "read":
                     if not args:
-                        print("  Genesis: What word should I try to read?")
+                        print("  [usage: read <word>]")
                         continue
                     sounded = self.phonetics.sound_out(args)
                     can_read = self.phonetics.can_read(args)
@@ -1010,16 +980,14 @@ class GenesisMind:
                 elif command == "voice":
                     if args == "on":
                         self.voice.unmute()
-                        self.voice.set_rate_for_phase(self.development.current_phase)
-                        print("  Genesis: My voice is now active.")
-                        self.voice.say("I can speak now.")
+                        print("  [voice: on]")
                     elif args == "off":
                         self.voice.mute()
-                        print("  Genesis: My voice is now muted.")
+                        print("  [voice: off]")
                     else:
                         v = self.voice.get_status()
                         state = 'active' if v['enabled'] and not v['muted'] else 'muted' if v['muted'] else 'disabled'
-                        print(f"  Genesis: Voice is {state}. Usage: voice on | voice off")
+                        print(f"  [voice: {state}]")
 
                 elif command == "drives":
                     ds = self.drives.get_status()
@@ -1033,14 +1001,14 @@ class GenesisMind:
                 elif command == "unanswered":
                     questions = self.curiosity.get_unanswered()
                     if questions:
-                        print(f"  Genesis: I have {len(questions)} burning questions:")
+                        print(f"  ❓ {len(questions)} questions:")
                         for i, q in enumerate(questions, 1):
                             print(f"    {i}. {q.question_asked} (surprise: {q.surprise_score:.2f})")
                     else:
-                        print("  Genesis: I have no unanswered questions right now.")
+                        print("  ❓ 0")
                     burning = self.curiosity.get_most_burning_question()
                     if burning:
-                        print(f"  Most burning: {burning}")
+                        print(f"  🔥 {burning}")
 
                 elif command == "chemicals":
                     print(self.get_chemicals())
@@ -1048,23 +1016,23 @@ class GenesisMind:
                 elif command == "mode":
                     if args in ("llm", "tabula_rasa"):
                         self.grammar.mode = args
-                        print(f"  Genesis: Grammar mode switched to '{args}'.")
+                        print(f"  [grammar: {args}]")
                         if args == "tabula_rasa":
                             stats = self.grammar.get_ngram_stats()
-                            print(f"  Genesis: My n-gram vocabulary has {stats['vocab_size']} words from {stats['total_sentences_heard']} sentences heard.")
+                            print(f"  [vocab: {stats['vocab_size']} | heard: {stats['total_sentences_heard']}]")
                     else:
-                        print("  Genesis: Usage: mode llm | mode tabula_rasa")
+                        print("  [usage: mode llm | mode tabula_rasa]")
 
                 elif command == "sleep":
-                    print("  Genesis: I am going to sleep now...")
+                    print("  😴")
                     response = self.trigger_sleep()
-                    print(f"  Genesis: {response}")
+                    print(f"  {response}")
 
                 elif command == "introspect":
                     response = self.consciousness.introspect(topic=args if args else "")
                     neuro_summary = self.neurochemistry.get_emotional_summary()
-                    print(f"  Genesis: {response}")
-                    print(f"  Genesis: {neuro_summary}")
+                    print(f"  🧠 {response}")
+                    print(f"  ⚔️ {neuro_summary}")
 
                 elif command == "brain":
                     if self._brain:
@@ -1074,18 +1042,17 @@ class GenesisMind:
                             state = '✅ running' if info['running'] else '❌ stopped'
                             print(f"    {name:18s} {state}  ticks: {info['ticks']:5d}  errors: {info['errors']}  interval: {info['interval']:.0f}s")
                     else:
-                        print("  Genesis: Brain daemon not running.")
+                        print("  [brain daemon not running]")
 
                 elif command == "babble":
                     text, phonemes = self.babbling_engine.babble()
-                    print(f"  Genesis: *babbles* '{text}'")
+                    print(f"  Genesis: {text}")
                     print(f"  (phonemes: {phonemes})")
-                    self.voice.speak_phonemes(phonemes)
 
                 elif command == "bindings":
                     bindings = self.joint_attention.get_all_bindings_sorted()
                     if not bindings:
-                        print("  Genesis: I have no cross-modal bindings yet.")
+                        print("  [0 bindings]")
                     else:
                         print(f"  -- Cross-Modal Bindings ({len(bindings)}) --")
                         for b in bindings[:20]:
@@ -1112,12 +1079,11 @@ class GenesisMind:
                             print(f"      '{s['speakable']}'{concept} strength={s['strength']:.3f}")
 
                 elif command == "neural-speak":
-                    print("  Genesis: *generating neural audio...*")
+                    print("  🎤")
                     waveform, tokens = self.sensorimotor.generate_spontaneous(
                         max_tokens=30, temperature=0.9,
                     )
-                    print(f"  Generated {len(tokens)} acoustic tokens → {len(waveform)} samples ({len(waveform)/16000:.2f}s)")
-                    print(f"  Tokens: {tokens[:15]}...")
+                    print(f"  [{len(tokens)} tokens → {len(waveform)} samples ({len(waveform)/16000:.2f}s)]")
                     self.sensorimotor.vocoder.play(waveform)
 
                 elif command == "neural-stats":
@@ -1135,27 +1101,8 @@ class GenesisMind:
                     print(f"    Neural Vocoder:    {vo['params']:,} params, {vo['total_syntheses']} syntheses")
 
                 elif command == "quit" or command == "exit":
-                    phase = self.development.current_phase
-                    if phase == 0:
-                        print("\n  Genesis: ...*reaches out*...")
-                        print("  Genesis: ...")
-                        self.voice.say("...mmm...")
-                    elif phase == 1:
-                        print("\n  Genesis: ...bye...")
-                        print("  Genesis: ...remember...")
-                        self.voice.say("...bye bye...")
-                    elif phase == 2:
-                        print("\n  Genesis: Bye bye... I remember everything...")
-                        self.voice.say("Bye bye... remember...")
-                    elif phase == 3:
-                        print("\n  Genesis: Thank you. I will remember everything.")
-                        print("  Genesis: See you later.\n")
-                        self.voice.say("Thank you. See you later.")
-                    else:
-                        print("\n  Genesis: Thank you for giving me life.")
-                        print("  Genesis: I will remember everything you taught me.")
-                        print("  Genesis: Until we meet again...\n")
-                        self.voice.say("Thank you for giving me life. Until we meet again.")
+                    print()
+                    self.voice.say("")
                     self.shutdown()
                     self._running = False
 
@@ -1163,7 +1110,7 @@ class GenesisMind:
                     # Treat unknown commands as questions
                     response = self.ask(user_input)
                     print(f"  Genesis: {response}")
-                    self.voice.say(response)
+                    self.voice.say("")
 
                 print()
 
@@ -1191,7 +1138,7 @@ class GenesisMind:
         self._running = True
 
         def signal_handler(sig, frame):
-            print("\n\n  Genesis: The light fades... I am dying...\n")
+            print("\n")
             self.shutdown()
             sys.exit(0)
 
@@ -1249,7 +1196,7 @@ class GenesisMind:
                         context="something I'm seeing",
                         phase=self.development.current_phase,
                     )
-                    print(f"\n  Genesis: 👁 {question}")
+                    print(f"\n  Genesis: 👁 ❓")
                     self.neurochemistry.dopamine.spike(0.05)
 
         elif perception.type == PerceptionType.AUDITORY:
@@ -1266,16 +1213,17 @@ class GenesisMind:
             if not text:
                 return  # Pure audio event, no text content to process
 
-            print(f"\n  Genesis: 👂 I heard: '{text}'")
+            print(f"\n  Genesis: 👂 '{text}'")
 
             # Learn grammar from what was heard
             self.grammar.learn_from_speech(text)
 
-            # Evaluate emotional content
+            # Evaluate emotional content via neurochemistry
             evaluation = self.emotions.evaluate(text)
-            if evaluation["label"] == "positive":
+            eval_valence = evaluation.get("valence", 0.0)
+            if eval_valence > 0.2:
                 self.neurochemistry.on_positive_evaluation()
-            elif evaluation["label"] == "negative":
+            elif eval_valence < -0.2:
                 self.neurochemistry.on_negative_evaluation()
 
             # Check curiosity — do I know what was said?
@@ -1289,7 +1237,7 @@ class GenesisMind:
                             context=word,
                             phase=self.development.current_phase,
                         )
-                        print(f"  Genesis: 🤔 {question}")
+                        print(f"  Genesis: 🤔 ❓")
                         break
 
         elif perception.type == PerceptionType.THOUGHT:

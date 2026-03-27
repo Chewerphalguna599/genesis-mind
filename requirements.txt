@@ -19,7 +19,7 @@ Pillow>=10.0.0                 # Image manipulation and format conversion
 chromadb>=0.4.0                # Local vector database, no server needed
 
 # --- Voice ---
-pyttsx3>=2.90                  # Text-to-speech (offline)
+# Neural vocoder only — no pretrained TTS (pyttsx3 removed)
 
 # --- Utilities ---
 scipy>=1.11.0                  # Signal processing for audio

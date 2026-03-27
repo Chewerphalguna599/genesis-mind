@@ -1,35 +1,34 @@
 """
-Genesis Mind — Voice (Text-to-Speech Output)
+Genesis Mind — Voice (Neural Vocalization)
 
-A mind without a mouth is incomplete. Genesis can perceive (eyes, ears)
-but until now could not speak back. This module gives Genesis a voice
-using pyttsx3 — a fully offline, CPU-native TTS engine.
+Genesis speaks through its NeuralVocoder — a from-scratch audio synthesis
+system. There is NO pretrained TTS engine (pyttsx3 removed).
 
-The voice adapts to the developmental phase:
-    - Newborn:    Slow, simple utterances
-    - Child:      Normal pace
-    - Adult:      Natural, fluid speech
+The voice system works in two modes:
+    1. Babble mode (Phase 0-2): Random phoneme sequences through the
+       babbling engine, played via the NeuralVocoder.
+    2. Neural mode (Phase 3+): The acoustic language model generates
+       token sequences, which the vocoder synthesizes into audio.
 
-The voice runs on a background thread so it never blocks the
-consciousness loop.
+This module is a thin interface that the rest of the system calls.
+The actual synthesis is done by the sensorimotor loop.
 """
 
 import logging
-import random
 import threading
 from typing import List, Optional
 
-from genesis.senses.babbling import BabblingEngine, PHONEME_TO_SPEECH
+from genesis.senses.babbling import BabblingEngine
 
 logger = logging.getLogger("genesis.senses.voice")
 
 
 class Voice:
     """
-    Genesis's mouth — text-to-speech output.
+    Genesis's mouth — neural vocalization only.
 
-    Uses pyttsx3 for fully offline speech synthesis.
-    Runs on a background thread to avoid blocking.
+    No pyttsx3. No pretrained TTS. Voice output comes from either
+    the babbling engine or the neural vocoder.
     """
 
     def __init__(self, enabled: bool = True, rate: int = 150, volume: float = 0.9):
@@ -37,28 +36,20 @@ class Voice:
         self._rate = rate
         self._volume = volume
         self._muted = False
-        self._engine = None
         self._lock = threading.Lock()
-        self._current_phase = 0  # Developmental phase gate
+        self._current_phase = 0
         self._babbling_engine: Optional[BabblingEngine] = None
+        self._sensorimotor = None  # Injected from GenesisMind
 
-        if self._enabled:
-            try:
-                import pyttsx3
-                self._engine = pyttsx3.init()
-                self._engine.setProperty('rate', self._rate)
-                self._engine.setProperty('volume', self._volume)
-                logger.info("Voice initialized (rate=%d, volume=%.1f)", rate, volume)
-            except Exception as e:
-                logger.warning("Could not initialize TTS engine: %s (voice disabled)", e)
-                self._engine = None
-                self._enabled = False
-        else:
-            logger.info("Voice disabled by configuration")
+        logger.info("Voice initialized (neural-only, rate=%d, volume=%.1f)", rate, volume)
 
     def set_babbling_engine(self, engine: BabblingEngine):
         """Connect the babbling engine for phase-gated vocalization."""
         self._babbling_engine = engine
+
+    def set_sensorimotor(self, sensorimotor):
+        """Connect the sensorimotor loop for neural audio synthesis."""
+        self._sensorimotor = sensorimotor
 
     def set_phase(self, phase: int):
         """Update the developmental phase for voice gating."""
@@ -66,110 +57,67 @@ class Voice:
 
     def say(self, text: str):
         """
-        Speak the given text aloud.
+        Neural vocalization.
 
-        PHASE-GATED:
-        - Phase 0-1: Blocked. Redirects to babbling.
-        - Phase 2: Can speak single learned words only.
-        - Phase 3+: Full speech unlocked.
+        Phase 0-1: Redirects to babbling (random phoneme sequences).
+        Phase 2+: Attempts neural vocoder synthesis. Falls back to babble.
 
-        Non-blocking — runs on a background thread.
+        This is a no-op for text content — Genesis doesn't have a
+        pretrained TTS engine. It can only produce neural audio.
         """
-        if not self._enabled or self._muted or self._engine is None:
+        if not self._enabled or self._muted:
             return
         if not text or not text.strip():
             return
 
-        # Phase gate: early phases can only babble
+        # All phases: attempt neural babble
         if self._current_phase <= 1:
-            # Redirect to babbling
             self.babble_random()
-            return
-        elif self._current_phase == 2:
-            # Limit to short phrases (max 3 words)
-            words = text.split()
-            text = " ".join(words[:3])
+        elif self._sensorimotor:
+            # Try neural vocoder synthesis
+            thread = threading.Thread(
+                target=self._neural_speak, daemon=True
+            )
+            thread.start()
+        else:
+            self.babble_random()
 
-        thread = threading.Thread(target=self._speak, args=(text,), daemon=True)
-        thread.start()
-
-    def speak_phonemes(self, phonemes: List[str]):
-        """
-        Speak a sequence of phonemes using TTS approximation.
-
-        Converts IPA-like symbols to speakable text and vocalizes them.
-        This is how Genesis "babbles" — producing raw sounds without words.
-        """
-        if not self._enabled or self._muted or self._engine is None:
-            return
-
-        speakable_parts = []
-        for p in phonemes:
-            speakable_parts.append(PHONEME_TO_SPEECH.get(p, p))
-
-        text = " ".join(speakable_parts)
-        thread = threading.Thread(target=self._speak, args=(text,), daemon=True)
-        thread.start()
+    def _neural_speak(self):
+        """Generate and play neural audio through the sensorimotor loop."""
+        with self._lock:
+            try:
+                if self._sensorimotor:
+                    tokens = self._sensorimotor.acoustic_lm.generate(length=8)
+                    if tokens:
+                        waveform = self._sensorimotor.vocoder.synthesize(tokens)
+                        if len(waveform) > 800:
+                            self._sensorimotor.vocoder.play(waveform)
+            except Exception as e:
+                logger.debug("Neural vocalization failed: %s", e)
 
     def babble_random(self):
         """
-        Generate and speak a random babble.
+        Generate and vocalize a random babble.
 
-        Uses the BabblingEngine if available, otherwise produces
-        a simple random consonant-vowel pair.
+        Uses the BabblingEngine to produce random phoneme sequences.
+        Returns the babble text for display.
         """
-        if not self._enabled or self._muted or self._engine is None:
-            return
+        if not self._enabled or self._muted:
+            return ""
 
         if self._babbling_engine:
             text, phonemes = self._babbling_engine.babble()
-        else:
-            # Fallback: simple random CV babble
-            from genesis.senses.babbling import CONSONANTS, VOWELS
-            c = random.choice(CONSONANTS)
-            v = random.choice(VOWELS)
-            text = PHONEME_TO_SPEECH.get(c, c) + PHONEME_TO_SPEECH.get(v, v)
-
-        thread = threading.Thread(target=self._speak, args=(text,), daemon=True)
-        thread.start()
-        return text
-
-    def _speak(self, text: str):
-        """Internal blocking speech — runs on background thread."""
-        with self._lock:
-            try:
-                self._engine.say(text)
-                self._engine.runAndWait()
-            except Exception as e:
-                logger.warning("TTS error: %s", e)
-
-    def set_rate(self, rate: int):
-        """Set speech rate (words per minute). Default ~150."""
-        self._rate = rate
-        if self._engine:
-            self._engine.setProperty('rate', rate)
-
-    def set_volume(self, volume: float):
-        """Set volume (0.0 to 1.0)."""
-        self._volume = max(0.0, min(1.0, volume))
-        if self._engine:
-            self._engine.setProperty('volume', self._volume)
-
-    def set_rate_for_phase(self, phase: int):
-        """Adjust speech rate based on developmental phase."""
-        phase_rates = {
-            0: 100,   # Newborn: very slow
-            1: 120,   # Infant: slow
-            2: 135,   # Toddler: moderate
-            3: 150,   # Child: normal
-            4: 165,   # Adolescent: slightly fast
-            5: 175,   # Adult: natural fluency
-        }
-        rate = phase_rates.get(phase, 150)
-        self.set_rate(rate)
+            # Vocalize through neural vocoder if available
+            if self._sensorimotor:
+                thread = threading.Thread(
+                    target=self._neural_speak, daemon=True
+                )
+                thread.start()
+            return text
+        return ""
 
     def mute(self):
-        """Mute the voice (speech calls become no-ops)."""
+        """Mute the voice."""
         self._muted = True
         logger.info("Voice muted")
 
@@ -180,7 +128,7 @@ class Voice:
 
     @property
     def is_enabled(self) -> bool:
-        return self._enabled and self._engine is not None
+        return self._enabled
 
     @property
     def is_muted(self) -> bool:
@@ -192,9 +140,10 @@ class Voice:
             "muted": self._muted,
             "rate": self._rate,
             "volume": self._volume,
-            "engine_active": self._engine is not None,
+            "engine": "neural_vocoder",
+            "has_sensorimotor": self._sensorimotor is not None,
         }
 
     def __repr__(self) -> str:
         state = "muted" if self._muted else ("active" if self._enabled else "disabled")
-        return f"Voice(state={state}, rate={self._rate})"
+        return f"Voice(state={state}, neural_only=True)"
