@@ -248,6 +248,10 @@ class PersonalityNetwork:
         Uses next-step prediction: given experience[t], predict
         the concept at experience[t+1]. This teaches the network
         to understand temporal patterns in its environment.
+        
+        Also includes a temporal consistency loss that penalizes
+        large jumps in the hidden state between consecutive steps,
+        encouraging smooth consciousness evolution.
         """
         if len(self._experience_buffer) < 3:
             return
@@ -265,14 +269,30 @@ class PersonalityNetwork:
         target_tensor = torch.from_numpy(np.array(targets, dtype=np.float32)).unsqueeze(0).to(DEVICE)  # (1, T, concept_dim)
 
         # Forward pass
-        _, prediction, _ = self.network(input_tensor, None)
+        _, prediction, hidden_states = self.network(input_tensor, None)
 
         # Prediction loss: should predict the next concept
         pred_flat = prediction.view(-1, self.concept_dim)
         target_flat = target_tensor.view(-1, self.concept_dim)
         labels = torch.ones(pred_flat.size(0), device=DEVICE)
 
-        loss = self.criterion(pred_flat, target_flat, labels)
+        prediction_loss = self.criterion(pred_flat, target_flat, labels)
+
+        # Temporal consistency loss: penalize large hidden state jumps
+        # This encourages smooth consciousness evolution over time
+        temporal_loss = torch.tensor(0.0, device=DEVICE)
+        if hidden_states.size(1) > 1:
+            # hidden_states shape: (num_layers, 1, hidden_dim) — but we need per-step
+            # We re-run to get per-step hidden states by processing sequentially
+            # For efficiency, use the GRU output (which has per-step states)
+            gru_output, _ = self.network.gru(input_tensor, None)  # (1, T, hidden_dim)
+            if gru_output.size(1) > 1:
+                h_diffs = gru_output[:, 1:, :] - gru_output[:, :-1, :]
+                temporal_loss = (h_diffs ** 2).mean()
+
+        # Combined loss with temporal consistency weight
+        TEMPORAL_WEIGHT = 0.01
+        loss = prediction_loss + TEMPORAL_WEIGHT * temporal_loss
 
         self.optimizer.zero_grad()
         loss.backward()

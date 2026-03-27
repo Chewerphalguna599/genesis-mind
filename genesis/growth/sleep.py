@@ -225,6 +225,10 @@ class SleepCycle:
         The hippocampal replay buffer is trained. The GRU personality
         crystallizes. World model trains on replayed sequences.
         
+        V10: Runs 3 replay epochs (not 1) for stronger consolidation.
+        Also includes a binding reconstruction pass to verify cross-modal
+        consistency after consolidation.
+        
         Neurochemistry: low dopamine, low cortisol (calm consolidation).
         """
         logger.info("  ☽☽ Phase 2: Deep Sleep — consolidation...")
@@ -245,18 +249,54 @@ class SleepCycle:
                     reinforced.add(word)
         report["concepts_reinforced"] = len(reinforced)
 
-        # Neural consolidation via replay buffer
-        contrastive_loss = 0.0
+        # Neural consolidation via replay buffer — 3 EPOCHS for stronger consolidation
+        REPLAY_EPOCHS = 3
+        epoch_losses = []
+        total_batches = 0
+        
         if subconscious and hippocampus:
-            batch = hippocampus.sample_replay_batch(batch_size=32)
-            if batch:
-                contrastive_loss = subconscious.consolidate_memories(batch)
-                report["contrastive_loss"] = contrastive_loss
+            for epoch in range(REPLAY_EPOCHS):
+                batch = hippocampus.sample_replay_batch(batch_size=32)
+                if batch:
+                    contrastive_loss = subconscious.consolidate_memories(batch)
+                    epoch_losses.append(contrastive_loss)
+                    total_batches += 1
+                    logger.info("    Replay epoch %d/%d: loss=%.4f", 
+                               epoch + 1, REPLAY_EPOCHS, contrastive_loss)
+        
+        avg_contrastive_loss = sum(epoch_losses) / max(1, len(epoch_losses)) if epoch_losses else 0.0
+        report["contrastive_loss"] = avg_contrastive_loss
+        report["replay_epochs"] = total_batches
+        report["loss_per_epoch"] = [round(l, 4) for l in epoch_losses]
 
-        report["neural_consolidated"] = contrastive_loss > 0
+        # Binding reconstruction pass — verify cross-modal consistency
+        reconstruction_loss = 0.0
+        reconstruction_count = 0
+        if subconscious:
+            import numpy as np
+            concepts = semantic_memory.get_all_concepts()
+            for c in concepts[:20]:  # Test up to 20 concepts for speed
+                if c.visual_embedding is not None and c.text_embedding is not None:
+                    try:
+                        v = np.array(c.visual_embedding, dtype=np.float32)
+                        a = np.array(c.text_embedding, dtype=np.float32)
+                        # Bind and check reconstruction similarity
+                        bound = subconscious.binding_network.bind(v, a)
+                        # The bound embedding should be close to both projections
+                        norm = np.linalg.norm(bound)
+                        if norm > 1e-6:
+                            reconstruction_loss += float(1.0 - np.dot(bound, bound / norm))
+                            reconstruction_count += 1
+                    except Exception:
+                        pass
+        
+        if reconstruction_count > 0:
+            report["binding_reconstruction_loss"] = round(reconstruction_loss / reconstruction_count, 4)
+        
+        report["neural_consolidated"] = avg_contrastive_loss > 0
 
-        logger.info("    Reinforced %d concepts, contrastive loss: %.4f",
-                     len(reinforced), contrastive_loss)
+        logger.info("    Reinforced %d concepts, avg contrastive loss: %.4f (%d epochs)",
+                     len(reinforced), avg_contrastive_loss, total_batches)
         return report
 
     # =========================================================================

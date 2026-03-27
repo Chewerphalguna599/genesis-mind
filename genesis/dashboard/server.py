@@ -330,11 +330,10 @@ class DashboardServer:
             }
             state["attention_threshold"] = mind.attention.salience_threshold
             
-            # 6. Brain Daemon Threads
+            # 6. Brain Daemon Threads (with profiling)
             threads = {}
             if hasattr(mind, "_brain") and mind._brain:
-                for name, t in mind._brain._threads.items():
-                    threads[name] = {"ticks": t._tick_count, "errors": t._errors}
+                threads = mind._brain.get_profiling()
             state["threads"] = threads
             
             # 7. Senses (Latest captures)

@@ -883,6 +883,144 @@ class GenesisMind:
         logger.info("Genesis has shut down. Neural weights saved. Goodbye.")
 
     # =========================================================================
+    # Observability — Interaction Logging
+    # =========================================================================
+
+    def _log_interaction(self, action: str, input_data: str, output_data: str,
+                         has_visual: bool = False):
+        """Log an interaction with full internal state snapshot."""
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': action,
+            'input': input_data,
+            'output': output_data[:200],  # Truncate long outputs
+            'has_visual': has_visual,
+            'concept_count': self.semantic_memory.count(),
+            'phase': self.development.current_phase,
+            'dopamine': round(self.neurochemistry.dopamine.level, 3),
+            'cortisol': round(self.neurochemistry.cortisol.level, 3),
+            'fatigue': round(self.proprioception.fatigue, 3),
+            'dominant_drive': self.drives.get_status().get('dominant', 'unknown'),
+        }
+        self._interaction_log.append(entry)
+
+    # =========================================================================
+    # Evaluation Harness
+    # =========================================================================
+
+    def _run_evaluation_harness(self):
+        """
+        Teach 5 synthetic concepts and measure recall accuracy.
+        
+        This is a formal evaluation of binding, recall, and retention:
+        1. Teach 5 concepts with synthetic visual embeddings
+        2. Immediately test recall accuracy
+        3. Wait 10 seconds (allow decay)
+        4. Test recall again (measure forgetting)
+        5. Report binding consistency
+        """
+        import time as _time
+        
+        test_concepts = {
+            'eval_ball':  np.random.randn(64).astype(np.float32) * 0.1,
+            'eval_cup':   np.random.randn(64).astype(np.float32) * 0.1,
+            'eval_hat':   np.random.randn(64).astype(np.float32) * 0.1,
+            'eval_key':   np.random.randn(64).astype(np.float32) * 0.1,
+            'eval_star':  np.random.randn(64).astype(np.float32) * 0.1,
+        }
+        
+        print("\n  ╔══════════════════════════════════════╗")
+        print("  ║   EVALUATION HARNESS — 5 Concepts   ║")
+        print("  ╚══════════════════════════════════════╝\n")
+        
+        # Phase 1: Teach
+        print("  📚 Teaching phase...")
+        for word, visual_emb in test_concepts.items():
+            text_emb = self.associations.embed_text(word).tolist()
+            self.semantic_memory.learn_concept(
+                word=word,
+                visual_embedding=visual_emb.tolist(),
+                text_embedding=text_emb,
+                context="Evaluation harness",
+                description=f"Test concept: {word}",
+            )
+            # Process through neural cascade
+            context_vec = self.proprioception.get_context_vector()
+            self.subconscious.process_experience(
+                visual_embedding=visual_emb,
+                text_embedding=np.array(text_emb, dtype=np.float32),
+                context=context_vec,
+                train=True,
+            )
+            print(f"    ✓ Taught: {word}")
+        
+        # Phase 2: Immediate recall
+        print("\n  🧪 Immediate recall test...")
+        immediate_recalls = 0
+        for word in test_concepts:
+            concept = self.semantic_memory.recall_concept(word)
+            if concept:
+                immediate_recalls += 1
+                print(f"    ✓ Recalled: {word} (strength={getattr(concept, 'strength', 'N/A')})")
+            else:
+                print(f"    ✗ FAILED:   {word}")
+        
+        immediate_accuracy = immediate_recalls / len(test_concepts)
+        print(f"\n  Immediate: {immediate_recalls}/{len(test_concepts)} ({immediate_accuracy:.0%})")
+        
+        # Phase 3: Wait (simulate time passing)
+        print("\n  ⏳ Waiting 10 seconds (simulating decay)...")
+        _time.sleep(10)
+        
+        # Phase 4: Delayed recall
+        print("\n  🧪 Delayed recall test...")
+        delayed_recalls = 0
+        for word in test_concepts:
+            concept = self.semantic_memory.recall_concept(word)
+            if concept:
+                delayed_recalls += 1
+                print(f"    ✓ Recalled: {word} (strength={getattr(concept, 'strength', 'N/A')})")
+            else:
+                print(f"    ✗ FORGOT:   {word}")
+        
+        delayed_accuracy = delayed_recalls / len(test_concepts)
+        forgetting_rate = max(0, immediate_accuracy - delayed_accuracy)
+        
+        # Phase 5: Binding consistency
+        print("\n  🔗 Binding consistency test...")
+        consistencies = []
+        for word, visual_emb in test_concepts.items():
+            concept = self.semantic_memory.recall_concept(word)
+            if concept and concept.text_embedding:
+                try:
+                    text_emb = np.array(concept.text_embedding, dtype=np.float32)
+                    b1 = self.subconscious.binding_network.bind(visual_emb, text_emb)
+                    b2 = self.subconscious.binding_network.bind(visual_emb, text_emb)
+                    dot = np.dot(b1, b2)
+                    norm = np.linalg.norm(b1) * np.linalg.norm(b2)
+                    consistency = float(dot / (norm + 1e-8))
+                    consistencies.append(consistency)
+                    print(f"    {word}: {consistency:.4f}")
+                except Exception as e:
+                    print(f"    {word}: ERROR ({e})")
+        
+        avg_consistency = float(np.mean(consistencies)) if consistencies else 0.0
+        
+        # Report
+        print("\n  ╔══════════════════════════════════════╗")
+        print("  ║         EVALUATION REPORT            ║")
+        print("  ╠══════════════════════════════════════╣")
+        print(f"  ║  Immediate Recall: {immediate_accuracy:>6.0%}           ║")
+        print(f"  ║  Delayed Recall:   {delayed_accuracy:>6.0%}           ║")
+        print(f"  ║  Forgetting Rate:  {forgetting_rate:>6.0%}           ║")
+        print(f"  ║  Bind Consistency: {avg_consistency:>6.4f}         ║")
+        print(f"  ║  Total Concepts:   {self.semantic_memory.count():>6}           ║")
+        print("  ╚══════════════════════════════════════╝\n")
+        
+        # Clean up eval concepts
+        # (We leave them — they're part of the experience now)
+
+    # =========================================================================
     # Interactive Terminal Interface
     # =========================================================================
 

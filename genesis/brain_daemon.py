@@ -46,6 +46,8 @@ logger = logging.getLogger("genesis.brain_daemon")
 class BrainThread:
     """A single daemon thread that runs a function on a timer."""
 
+    MAX_CONSECUTIVE_ERRORS = 10  # Auto-disable after this many consecutive errors
+
     def __init__(self, name: str, target: Callable, interval_sec: float,
                  enabled: bool = True):
         self.name = name
@@ -56,12 +58,17 @@ class BrainThread:
         self._stop_event = threading.Event()
         self._tick_count = 0
         self._errors = 0
+        self._consecutive_errors = 0
+        self._auto_disabled = False
+        self._last_heartbeat = 0.0
+        self._cumulative_exec_time = 0.0
 
     def start(self):
         if not self.enabled:
             logger.info("  [%s] disabled — skipping", self.name)
             return
         self._stop_event.clear()
+        self._auto_disabled = False
         self._thread = threading.Thread(
             target=self._loop, name=f"genesis-{self.name}", daemon=True
         )
@@ -71,24 +78,56 @@ class BrainThread:
     def stop(self):
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=3.0)
-        logger.info("  [%s] stopped (%d ticks, %d errors)",
-                     self.name, self._tick_count, self._errors)
+            self._thread.join(timeout=5.0)
+        logger.info("  [%s] stopped (%d ticks, %d errors, %.1fs exec time)",
+                     self.name, self._tick_count, self._errors, self._cumulative_exec_time)
 
     def _loop(self):
         while not self._stop_event.is_set():
+            if self._auto_disabled:
+                self._stop_event.wait(self.interval_sec)
+                continue
             try:
+                import time as _time
+                start = _time.time()
                 self._target()
+                elapsed = _time.time() - start
+                self._cumulative_exec_time += elapsed
                 self._tick_count += 1
+                self._consecutive_errors = 0  # Reset on success
+                self._last_heartbeat = _time.time()
             except Exception as e:
                 self._errors += 1
-                logger.error("[%s] error (tick %d): %s",
-                             self.name, self._tick_count, e)
+                self._consecutive_errors += 1
+                logger.error("[%s] error (tick %d, consecutive=%d): %s",
+                             self.name, self._tick_count, self._consecutive_errors, e)
+                # Auto-disable if too many consecutive errors
+                if self._consecutive_errors >= self.MAX_CONSECUTIVE_ERRORS:
+                    self._auto_disabled = True
+                    logger.warning("[%s] AUTO-DISABLED after %d consecutive errors",
+                                   self.name, self._consecutive_errors)
             self._stop_event.wait(self.interval_sec)
 
     @property
     def is_running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+        return (self._thread is not None and self._thread.is_alive() 
+                and not self._auto_disabled)
+
+    def get_health(self) -> Dict[str, Any]:
+        """Get thread health status for monitoring."""
+        import time as _time
+        now = _time.time()
+        heartbeat_age = now - self._last_heartbeat if self._last_heartbeat > 0 else -1
+        return {
+            "ticks": self._tick_count,
+            "errors": self._errors,
+            "consecutive_errors": self._consecutive_errors,
+            "auto_disabled": self._auto_disabled,
+            "heartbeat_age_sec": round(heartbeat_age, 1),
+            "is_running": self.is_running,
+            "cumulative_exec_sec": round(self._cumulative_exec_time, 2),
+            "avg_exec_ms": round(self._cumulative_exec_time / max(1, self._tick_count) * 1000, 1),
+        }
 
 
 class BrainDaemon:
@@ -358,6 +397,25 @@ class BrainDaemon:
         for name, thread in self._threads.items():
             thread.stop()
         logger.info("All brain threads stopped.")
+
+    def get_profiling(self) -> Dict[str, Any]:
+        """Get per-thread profiling and health data."""
+        result = {}
+        for name, thread in self._threads.items():
+            result[name] = thread.get_health()
+        return result
+
+    def restart_thread(self, name: str) -> bool:
+        """Manually restart a specific thread (e.g., after auto-disable)."""
+        if name in self._threads:
+            thread = self._threads[name]
+            thread.stop()
+            thread._auto_disabled = False
+            thread._consecutive_errors = 0
+            thread.start()
+            logger.info("Manually restarted thread: %s", name)
+            return True
+        return False
 
     # =========================================================================
     # Replay Signal Helpers

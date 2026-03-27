@@ -226,5 +226,5 @@ class BindingNetwork:
             "params": sum(p.numel() for p in self.network.parameters()),
             "last_grad_norm": round(self._last_grad_norm, 6),
             "current_lr": round(self.scheduler.get_lr(), 8),
-            "logit_scale": round(float(self.network.logit_scale.exp()), 4),
+            "logit_scale": round(float(self.network.logit_scale.detach().exp()), 4),
         }

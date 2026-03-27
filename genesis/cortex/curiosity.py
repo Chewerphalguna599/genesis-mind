@@ -73,6 +73,10 @@ class CuriosityEngine:
         self._total_questions = 0
         self._total_evaluations = 0
 
+        # Information-gain tracking
+        self._prediction_error_history: deque = deque(maxlen=200)
+        self._adaptive_threshold = surprise_threshold  # Starts at static, adapts over time
+
         logger.info("Curiosity engine initialized (threshold=%.2f)", surprise_threshold)
 
     def compute_surprise(self, embedding: np.ndarray,
@@ -110,12 +114,55 @@ class CuriosityEngine:
         self._total_evaluations += 1
         return float(np.clip(surprise, 0.0, 1.0))
 
-    def should_ask(self, surprise: float, stimulus_key: str = "") -> bool:
+    def compute_information_gain(self, prediction_error: float) -> float:
+        """
+        Compute information gain from a stimulus based on prediction error.
+        
+        Information gain = how much did this stimulus teach us?
+        A high prediction error means the world model was wrong,
+        so exploring this stimulus has potential to teach more.
+        
+        This is a smarter curiosity signal than pure novelty:
+        - Novelty: "I haven't seen this before"
+        - Information gain: "I can LEARN from this"
+        
+        Returns:
+            Information gain score (0-1, normalized)
+        """
+        self._prediction_error_history.append(prediction_error)
+        self._total_evaluations += 1
+        
+        if len(self._prediction_error_history) < 5:
+            # Not enough data — fall back to raw error
+            return min(1.0, prediction_error)
+        
+        errors = list(self._prediction_error_history)
+        mean_error = sum(errors) / len(errors)
+        std_error = (sum((e - mean_error) ** 2 for e in errors) / len(errors)) ** 0.5
+        
+        # Update adaptive threshold
+        if std_error > 0:
+            self._adaptive_threshold = mean_error + 1.5 * std_error
+        
+        # Information gain = how far above the mean this error is
+        if std_error > 1e-6:
+            z_score = (prediction_error - mean_error) / std_error
+            return float(np.clip(z_score / 3.0, 0.0, 1.0))  # Normalize to 0-1
+        else:
+            return 0.0  # No variance — nothing is surprising
+
+    def should_ask(self, surprise: float, stimulus_key: str = "",
+                   prediction_error: float = -1.0,
+                   mode: str = "information_gain") -> bool:
         """
         Determine if Genesis should ask a curiosity question.
 
+        Modes:
+            "novelty": Original mode — surprise based on cosine distance
+            "information_gain": Adaptive threshold from prediction error distribution
+
         Factors:
-        1. Surprise must exceed the threshold
+        1. Surprise/information gain must exceed threshold
         2. Must not be in cooldown period (avoid spamming questions)
         3. Habituation: repeated exposure reduces curiosity
         """
@@ -124,16 +171,23 @@ class CuriosityEngine:
         if now - self._last_question_time < self._cooldown_sec:
             return False
 
+        # Compute effective surprise based on mode
+        if mode == "information_gain" and prediction_error >= 0:
+            info_gain = self.compute_information_gain(prediction_error)
+            effective_surprise = info_gain
+            threshold = 0.5  # Information gain uses its own normalized scale
+        else:
+            effective_surprise = surprise
+            threshold = self._surprise_threshold
+
         # Apply habituation: reduce effective surprise based on exposure
         if stimulus_key:
             exposure = self._exposure_counts[stimulus_key]
             habituation_factor = max(0.0, 1.0 - exposure * self._habituation_rate)
-            effective_surprise = surprise * habituation_factor
+            effective_surprise = effective_surprise * habituation_factor
             self._exposure_counts[stimulus_key] += 1
-        else:
-            effective_surprise = surprise
 
-        return effective_surprise > self._surprise_threshold
+        return effective_surprise > threshold
 
     def generate_question(self, context: str = "", phase: int = 0) -> str:
         """
@@ -181,6 +235,8 @@ class CuriosityEngine:
             "unique_stimuli_encountered": len(self._exposure_counts),
             "cooldown_sec": self._cooldown_sec,
             "surprise_threshold": self._surprise_threshold,
+            "adaptive_threshold": round(self._adaptive_threshold, 4),
+            "prediction_errors_tracked": len(self._prediction_error_history),
         }
 
     def mark_answered(self, stimulus_key: str):
