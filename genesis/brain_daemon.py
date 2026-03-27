@@ -320,6 +320,13 @@ class BrainDaemon:
             interval_sec=15.0,  # Check every 15s if Genesis wants to say something
         )
 
+        # Thread 14: Neural Growth — the brain physically grows
+        self._threads["neural_growth"] = BrainThread(
+            name="neural_growth",
+            target=self._tick_neural_growth,
+            interval_sec=30.0,  # Check for growth every 30 seconds
+        )
+
     # =========================================================================
     # Start / Stop
     # =========================================================================
@@ -1041,6 +1048,174 @@ class BrainDaemon:
             except Exception:
                 pass
             self._last_auto_respond = now
+
+    # =========================================================================
+    # Thread 14: Neural Growth (The Brain Physically Grows)
+    # =========================================================================
+
+    def _tick_neural_growth(self):
+        """
+        The brain grows with experience — just like a real brain.
+
+        Human brain development:
+            - Infant: 700 new synapses per second
+            - Child: Myelination, pruning, cortical thickening
+            - Adult: Hippocampal neurogenesis continues
+            - Never stops: even in old age, learning grows dendrites
+
+        Genesis is the same. Every 30s, this thread checks:
+            1. Has the concept count crossed a growth threshold?
+            2. Has the developmental phase advanced?
+            3. Are sensory cortices saturated (need more capacity)?
+
+        If yes: grow the networks. New neurons inherit from existing
+        weight statistics — transfer from self.
+        """
+        try:
+            mind = self.mind
+            concept_count = mind.semantic_memory.count()
+            phase = mind.development.current_phase
+
+            # Check if core networks need to grow (Personality GRU, MetaController)
+            if mind.neuroplasticity.should_grow(phase, mind.subconscious, concept_count):
+                report = mind.neuroplasticity.grow_networks(
+                    phase, mind.subconscious, concept_count,
+                )
+                if report.get("params_added", 0) > 0:
+                    self._emit(
+                        f"🧠 brain grew: +{report['params_added']:,} params "
+                        f"({report['params_before']:,} → {report['params_after']:,})",
+                        "🌱"
+                    )
+
+            # ── Grow Sensory Cortices ──
+            # Visual cortex grows with visual experience
+            self._grow_sensory_cortex(concept_count, phase)
+
+            # ── Grow Acoustic Pipeline ──
+            self._grow_acoustic_pipeline(concept_count, phase)
+
+        except Exception as e:
+            logger.debug("[neural-growth] Growth check failed: %s", e)
+
+    def _grow_sensory_cortex(self, concept_count: int, phase: int):
+        """
+        Grow the visual cortex encoder as visual experience accumulates.
+
+        Like myelination in the visual cortex — pathways that are
+        used more get thicker and faster.
+        """
+        try:
+            import math
+            eyes = self.mind._get_eyes()
+            if eyes is None or not hasattr(eyes, 'visual_cortex'):
+                return
+
+            vc = eyes.visual_cortex
+            if not hasattr(vc, 'encoder'):
+                return
+
+            # Target channel growth: base 32 + sqrt(concepts) * 4
+            current_channels = None
+            for m in vc.encoder.modules():
+                if hasattr(m, 'out_channels'):
+                    current_channels = m.out_channels
+
+            if current_channels is None:
+                return
+
+            target_channels = 32 + int(math.sqrt(concept_count) * 4)
+            target_channels = ((target_channels + 15) // 16) * 16  # Round to 16
+
+            if target_channels > current_channels and concept_count >= 50:
+                # Rebuild visual cortex with larger channels
+                from genesis.neural.neuroplasticity import _grow_linear
+                import torch.nn as nn
+
+                # Just log the growth need for now — full Conv2D growth
+                # would require a more complex rebuild
+                logger.info(
+                    "[neural-growth] 👁 Visual cortex needs growth: %d → %d channels "
+                    "(will grow at next restart or via neuroplasticity)",
+                    current_channels, target_channels,
+                )
+        except Exception:
+            pass  # Vision may not be available
+
+    def _grow_acoustic_pipeline(self, concept_count: int, phase: int):
+        """
+        Grow the acoustic cortex and VQ codebook with auditory experience.
+
+        Like auditory cortex tonotopic expansion — areas that process
+        frequently heard frequencies grow more neurons.
+        """
+        try:
+            import math
+            sm = self.mind.sensorimotor
+            if sm is None:
+                return
+
+            # ── VQ Codebook Growth ──
+            # More concepts → need more VQ entries to represent finer distinctions
+            vq = sm.codebook
+            current_size = vq.num_entries
+            target_size = 256 + int(math.sqrt(concept_count) * 16)
+            target_size = min(target_size, 2048)  # Practical cap
+
+            if target_size > current_size and concept_count >= 25:
+                # Grow codebook by adding new entries
+                import torch
+                old_entries = vq.entries.data.clone()
+                new_entries = torch.zeros(target_size, vq.dim)
+
+                # Copy existing entries
+                new_entries[:current_size] = old_entries
+
+                # Initialize new entries from statistics of existing
+                mean = old_entries.mean(dim=0)
+                std = old_entries.std(dim=0)
+                for i in range(current_size, target_size):
+                    new_entries[i] = mean + torch.randn(vq.dim) * std * 0.5
+
+                vq.entries = torch.nn.Parameter(new_entries, requires_grad=False)
+                vq.num_entries = target_size
+
+                # Update usage tracking
+                if hasattr(vq, '_usage'):
+                    old_usage = vq._usage
+                    new_usage = torch.zeros(target_size)
+                    new_usage[:current_size] = old_usage
+                    vq._usage = new_usage
+
+                logger.info(
+                    "[neural-growth] 🔊 VQ codebook grew: %d → %d entries",
+                    current_size, target_size,
+                )
+                self._emit(
+                    f"🔊 acoustic codebook grew: {current_size} → {target_size} entries",
+                    "🌱"
+                )
+
+            # ── Auditory Cortex Conv1D Growth ──
+            # The encoder processes richer features as it hears more
+            ac = sm.auditory_cortex
+            if hasattr(ac, 'encoder'):
+                # Check if encoder needs more channels
+                for name, module in ac.encoder.named_modules():
+                    if hasattr(module, 'out_channels'):
+                        current_ch = module.out_channels
+                        target_ch = 64 + int(math.sqrt(concept_count) * 4)
+                        target_ch = ((target_ch + 15) // 16) * 16
+                        if target_ch > current_ch and concept_count >= 100:
+                            logger.info(
+                                "[neural-growth] 🔊 Auditory cortex needs growth: "
+                                "%d → %d channels",
+                                current_ch, target_ch,
+                            )
+                        break  # Only check first conv layer
+
+        except Exception as e:
+            logger.debug("[neural-growth] Acoustic growth check failed: %s", e)
 
     # =========================================================================
     # Stats
