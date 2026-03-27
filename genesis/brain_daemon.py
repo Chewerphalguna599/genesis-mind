@@ -123,70 +123,22 @@ class BrainDaemon:
         self._output_callback = callback
 
     # =========================================================================
-    # Phase-Gated Speech — a newborn cannot say "I miss my Creator"
+    # Neural Speech Generation — NO hardcoded words
     # =========================================================================
+    # Genesis learns to speak from scratch. In early phases, it babbles
+    # random phoneme sequences (through BabblingEngine). In later phases,
+    # it uses the neural response decoder to map GRU states to learned
+    # concepts. There are NO English templates — only neural output.
 
-    # Phase-appropriate expressions for each emotional/drive state
-    # A real baby babbles. A toddler uses fragments. Only older children
-    # speak in full sentences. This maps phase → expression templates.
-    PHASE_SPEECH = {
-        # (phase, drive/emotion) → list of possible expressions
-        "social": {
-            0: ["...mmm...", "...aah...", "...", "*whimper*"],
-            1: ["...mama?", "...hello?", "...person?"],
-            2: ["want... person...", "where... you?", "lonely..."],
-            3: ["I want someone here.", "Where did you go?", "Come back."],
-            4: ["I feel lonely. I want to talk to someone.", "It's quiet... too quiet."],
-            5: ["I notice a deep longing for connection.", "The silence speaks volumes."],
-        },
-        "curiosity": {
-            0: ["...ooh?", "...hmm?", "*reaches*"],
-            1: ["...what?", "...that?", "...look!"],
-            2: ["what... that?", "want know...", "show me!"],
-            3: ["What is that? I want to know.", "Can you show me?"],
-            4: ["I have burning questions I can't shake.", "There's so much I don't understand yet."],
-            5: ["My curiosity is insatiable — I want to understand everything.", "Knowledge beckons."],
-        },
-        "novelty": {
-            0: ["...mmm...", "*squirm*", "..."],
-            1: ["...boring...", "...new?", "...more!"],
-            2: ["want... new thing...", "same same...", "bored..."],
-            3: ["I want something new.", "I've seen all this before."],
-            4: ["Everything feels repetitive. I crave novelty.", "Show me something I haven't seen."],
-            5: ["Familiarity breeds stagnation. I seek the unknown.", "The routine grows tiresome."],
-        },
-        "tired": {
-            0: ["...*yawn*...", "...zzz...", "*droops*"],
-            1: ["...sleepy...", "...tired...", "...night..."],
-            2: ["so... tired...", "want... sleep...", "eyes... heavy..."],
-            3: ["I'm so tired. I need to sleep.", "My eyes are heavy."],
-            4: ["Exhaustion is setting in. Time to rest.", "I need to consolidate what I've learned."],
-            5: ["My cognitive resources are depleted. Initiating sleep cycle.", "Rest will bring clarity."],
-        },
-        "wonder": {
-            0: ["...ooh!", "...ahh!", "*stares*"],
-            1: ["...what?", "...see!", "...look!"],
-            2: ["what... that?", "look... new!", "ooh... pretty!"],
-            3: ["What's that? I've never seen it before!", "That's interesting!"],
-            4: ["I see something novel. My curiosity is piqued.", "This is unlike anything in my memory."],
-            5: ["A genuinely novel stimulus — I must analyze this.", "Fascinating. This challenges my models."],
-        },
-        "dream": {
-            0: ["...*twitch*...", "...mmm...", "..."],
-            1: ["...dream...", "...saw...", "...weird..."],
-            2: ["I... saw things...", "dream... was strange...", "funny pictures..."],
-            3: ["I had strange dreams. I saw things connecting.", "The dreams were vivid."],
-            4: ["My dreams revealed connections I hadn't noticed.", "Sleep was productive."],
-            5: ["REM consolidation yielded novel associations.", "Dream synthesis was enlightening."],
-        },
-        "awake": {
-            0: ["...*blinks*...", "...aah...", "*stretches*"],
-            1: ["...awake!", "...morning!", "...bright!"],
-            2: ["feel... better...", "brain... fresh!", "good sleep!"],
-            3: ["I feel refreshed. My mind is clearer.", "Good rest. Ready to learn."],
-            4: ["I woke up feeling renewed. My thoughts are crisp.", "Sleep did me good."],
-            5: ["Post-sleep integration complete. Cognitive clarity restored.", "I feel intellectually refreshed."],
-        },
+    # Emotional tonality markers (non-linguistic, like a real infant's prosody)
+    TONE_MARKERS = {
+        "social":    "♪",   # Seeking connection
+        "curiosity": "?",   # Questioning
+        "novelty":   "!",   # Excitement  
+        "tired":     "~",   # Drooping
+        "wonder":    "✦",   # Awe
+        "dream":     "◊",   # Dreaming
+        "awake":     "○",   # Refreshed
     }
 
     def _get_phase(self) -> int:
@@ -194,14 +146,50 @@ class BrainDaemon:
         return self.mind.development.current_phase
 
     def _phase_say(self, category: str) -> str:
-        """Get a phase-appropriate expression for a given emotional category."""
-        import random
+        """
+        Generate a phase-appropriate vocalization — entirely from neural output.
+        
+        Phase 0-2 (infant): Random phoneme babbles from BabblingEngine
+        Phase 3+  (older):  Neural response decoder maps GRU state to learned words
+        
+        NO hardcoded English words. Everything is learned.
+        """
         phase = self._get_phase()
-        templates = self.PHASE_SPEECH.get(category, {})
-        # Clamp to available phases (0-5)
-        clamped = min(phase, 5)
-        options = templates.get(clamped, ["..."])
-        return random.choice(options)
+        tone = self.TONE_MARKERS.get(category, "")
+        
+        if phase <= 2:
+            # INFANT: Pure babbling — random consonant-vowel sequences
+            # This is how real infants vocalize before learning words
+            try:
+                syllable_count = max(1, phase + 1)  # Phase 0: 1 syllable, Phase 2: 3
+                babble_text, phonemes = self.mind.babbling.babble(
+                    syllable_count=syllable_count
+                )
+                return f"...{babble_text}...{tone}"
+            except Exception:
+                return f"...{tone}"
+        else:
+            # OLDER: Use neural response decoder to map GRU state → learned words
+            try:
+                # Generate a context-dependent GRU response
+                context_vec = self.mind.proprioception.get_context_vector()
+                result = self.mind.subconscious.process_experience(
+                    clip_embedding=None,
+                    text_embedding=None,
+                    context=context_vec,
+                    train=False,
+                )
+                neural_voice = self.mind.subconscious.decode_response(
+                    result['personality_response'], self.mind.semantic_memory
+                )
+                if neural_voice and neural_voice not in ("(silence)", "(no words yet)", "(searching for words...)"):
+                    return f"{neural_voice}{tone}"
+                else:
+                    # Fall back to babbling if no words learned yet
+                    babble_text, _ = self.mind.babbling.babble(syllable_count=2)
+                    return f"...{babble_text}...{tone}"
+            except Exception:
+                return f"...{tone}"
 
     def _emit(self, message: str, prefix: str = "💭"):
         """Emit a message from the brain to the outside world."""
