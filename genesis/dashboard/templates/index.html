@@ -192,6 +192,23 @@
                 </div>
             </section>
 
+            <!-- Brain & Personality -->
+            <section class="glass-panel">
+                <h2>🧬 BRAIN & PERSONALITY</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div class="mini-stat"><div class="label">Concepts</div><div class="value" id="bp-concepts">0</div></div>
+                    <div class="mini-stat"><div class="label">Brain Size</div><div class="value" id="bp-params">0</div></div>
+                    <div class="mini-stat"><div class="label">Experiences</div><div class="value" id="bp-experiences">0</div></div>
+                    <div class="mini-stat"><div class="label">Predictions</div><div class="value" id="bp-predictions">0</div></div>
+                </div>
+                <div style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.4rem;">Routing Personality</div>
+                <div class="chart-container" style="min-height: 200px; height: 200px;">
+                    <canvas id="personalityRadar"></canvas>
+                </div>
+                <div style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin: 0.75rem 0 0.4rem;">Concept Constellation</div>
+                <div id="concept-constellation" style="min-height: 180px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden;"></div>
+            </section>
+
         </div>
         
         <!-- Column 3: Neural Architecture -->
@@ -462,9 +479,128 @@
                     if (paramsEl && data.total_params) {
                         paramsEl.textContent = (data.total_params / 1000).toFixed(0) + 'K params';
                     }
+                    // Update personality radar from routing data
+                    if (data.routing && personalityRadar) {
+                        personalityRadar.data.datasets[0].data = [
+                            data.routing.limbic || 0,
+                            data.routing.binding || 0,
+                            data.routing.personality || 0,
+                            data.routing.world_model || 0
+                        ];
+                        personalityRadar.update('none');
+                    }
                 })
                 .catch(() => {});
         }
+
+        // Brain & Personality panel updates (from /api/state)
+        function updateBrainPanel(state) {
+            if (!state) return;
+            const bpConcepts = document.getElementById('bp-concepts');
+            const bpParams = document.getElementById('bp-params');
+            const bpExperiences = document.getElementById('bp-experiences');
+            const bpPredictions = document.getElementById('bp-predictions');
+            if (bpConcepts && state.memory) bpConcepts.textContent = state.memory.semantic_concepts || 0;
+            if (bpParams && state.neural) bpParams.textContent = (state.neural.total_parameters / 1000).toFixed(0) + 'K';
+            if (bpExperiences && state.neural) bpExperiences.textContent = state.neural.layer3_personality.total_experiences || 0;
+            if (bpPredictions && state.neural) bpPredictions.textContent = state.neural.layer4_world_model.total_predictions || 0;
+            
+            // Concept constellation
+            if (state.network_graph && state.network_graph.nodes) {
+                drawConstellation(state.network_graph.nodes);
+            }
+        }
+
+        // Draw concept constellation — a mini force-layout of concepts
+        function drawConstellation(nodes) {
+            const container = document.getElementById('concept-constellation');
+            if (!container || nodes.length === 0) return;
+            const w = container.clientWidth;
+            const h = Math.max(container.clientHeight, 180);
+
+            // Only rebuild if concept count changed
+            if (container.dataset.count === String(nodes.length)) return;
+            container.dataset.count = String(nodes.length);
+            container.innerHTML = '';
+
+            const cx = w / 2, cy = h / 2;
+            nodes.forEach((n, i) => {
+                const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+                const strength = n.strength || 0.05;
+                const radius = 30 + (1 - strength) * Math.min(cx - 30, cy - 30); // Strong = center, weak = edge
+                const px = cx + Math.cos(angle) * radius;
+                const py = cy + Math.sin(angle) * radius;
+                const sz = 8 + strength * 28; // 8px at min, 36px at full strength
+                const alpha = 0.3 + strength * 0.7;
+                const glow = strength > 0.5 ? `box-shadow: 0 0 ${strength*12}px rgba(186,104,200,${strength});` : '';
+                
+                const dot = document.createElement('div');
+                dot.style.cssText = `position:absolute; left:${px - sz/2}px; top:${py - sz/2}px; width:${sz}px; height:${sz}px; border-radius:50%; background:rgba(186,104,200,${alpha}); transition: all 0.5s; ${glow}`;
+                dot.title = `${n.label} (strength: ${(strength*100).toFixed(0)}%)`;
+                container.appendChild(dot);
+
+                // Label for strong concepts
+                if (strength > 0.01 || n.label.indexOf('proto') === -1) {
+                    const label = document.createElement('div');
+                    label.style.cssText = `position:absolute; left:${px}px; top:${py + sz/2 + 2}px; font-size:0.55rem; color:rgba(255,255,255,${0.4 + strength * 0.6}); text-align:center; transform:translateX(-50%); white-space:nowrap; pointer-events:none;`;
+                    label.textContent = n.label;
+                    container.appendChild(label);
+                }
+            });
+            
+            // Draw connection lines for edges (draw SVG)
+            // Skip for now — concept labels are enough
+        }
+
+        // Init personality radar chart
+        let personalityRadar = null;
+        (function initPersonalityRadar() {
+            const el = document.getElementById('personalityRadar');
+            if (!el) return;
+            personalityRadar = new Chart(el.getContext('2d'), {
+                type: 'radar',
+                data: {
+                    labels: ['Limbic\n(Emotional)', 'Binding\n(Association)', 'Personality\n(Memory)', 'World Model\n(Prediction)'],
+                    datasets: [{
+                        label: 'Routing Weight',
+                        data: [0.25, 0.25, 0.25, 0.25],
+                        backgroundColor: 'rgba(124, 77, 255, 0.25)',
+                        borderColor: '#7c4dff',
+                        pointBackgroundColor: '#7c4dff',
+                        pointHoverBackgroundColor: '#fff',
+                        borderWidth: 2,
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255,255,255,0.1)' },
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            pointLabels: { color: '#f0f0f5', font: { size: 9 } },
+                            ticks: { display: false },
+                            suggestedMin: 0,
+                            suggestedMax: 0.5
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        })();
+
+        // Hook brain panel into main state fetch
+        const _origFetchState = window._fetchState;
+        (function hookBrainPanel() {
+            // Intercept state fetches by periodically fetching ourselves
+            setInterval(() => {
+                fetch('/api/state')
+                    .then(r => r.json())
+                    .then(data => updateBrainPanel(data))
+                    .catch(() => {});
+            }, 3000);
+        })();
 
         // Poll every 2 seconds
         setInterval(fetchActivations, 2000);

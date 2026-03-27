@@ -36,7 +36,7 @@ const brainOptions = {
         senses: { size: 20, color: {background: 'rgba(239, 83, 80, 0.8)'} },
         limbic: { size: 20, color: {background: 'rgba(255, 152, 0, 0.8)'} },
         memory: { size: 15, color: {background: 'rgba(186, 104, 200, 0.8)'} },
-        hidden: { size: 8, color: {background: 'rgba(79, 195, 247, 0.1)'} },
+        hidden: { size: 10, color: {background: 'rgba(79, 195, 247, 0.3)'} },
         output: { size: 14, color: {background: 'rgba(255, 213, 79, 0.7)'} },
         acoustic: { size: 18, color: {background: 'rgba(0, 230, 118, 0.8)'} },
         vocoder: { size: 16, color: {background: 'rgba(124, 77, 255, 0.8)'} }
@@ -448,22 +448,43 @@ function updateUI(state) {
                     }
                 });
             } else {
-                // Gentle pulse for waking recall
+                // Scale concept nodes by strength — strong concepts are LARGE and BRIGHT
                 memoryNodesCurrent.forEach(n => {
-                    updates.push({id: n.id, size: 12 + (Math.random()*3), color: {background: `rgba(186, 104, 200, 0.8)`}});
+                    // Find the original concept data for this node
+                    const conceptId = n.id.replace('mem_', '');
+                    const conceptNode = state.network_graph.nodes.find(c => c.id === conceptId);
+                    const strength = conceptNode ? (conceptNode.strength || 0.1) : 0.1;
+                    const sz = 8 + (strength * 25); // 8px at 0 strength, 33px at full
+                    const alpha = 0.3 + (strength * 0.7); // 0.3 at 0, 1.0 at full
+                    updates.push({id: n.id, size: sz, color: {background: `rgba(186, 104, 200, ${alpha})`}});
                 });
             }
         }
 
-        // 4. Update 128-dim Personality Core Hidden State
+        // 4. Update 128-dim Personality Core Hidden State — VIVID diverging colormap
         const hs = state.neural.layer3_personality.hidden_state_activation || [];
         for (let i = 0; i < hs.length && i < 128; i++) {
             const val = hs[i];
-            const intensity = Math.min(Math.max((val + 1) / 2, 0.1), 1);
+            // Red for negative, green for positive, bright always
+            let r, g, b;
+            if (val >= 0) {
+                // Positive: black → bright green
+                const t = Math.min(val * 2.5, 1.0);
+                r = Math.floor(30 * (1 - t));
+                g = Math.floor(80 + 175 * t);
+                b = Math.floor(30 * (1 - t));
+            } else {
+                // Negative: black → bright red
+                const t = Math.min(Math.abs(val) * 2.5, 1.0);
+                r = Math.floor(80 + 175 * t);
+                g = Math.floor(30 * (1 - t));
+                b = Math.floor(30 * (1 - t));
+            }
+            const brightness = Math.max(0.4, Math.min(Math.abs(val) * 3, 1.0));
             updates.push({
                 id: `h_${i}`,
-                color: { background: `rgba(79, 195, 247, ${intensity})` },
-                size: 6 + (intensity * 6) // pulse size slightly
+                color: { background: `rgba(${r}, ${g}, ${b}, ${brightness})` },
+                size: 7 + (Math.abs(val) * 10)
             });
         }
         
