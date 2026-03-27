@@ -1,8 +1,8 @@
-# Genesis Mind V7 — Architecture Deep Dive
+# Genesis Mind V8 — Architecture Deep Dive
 
-> *The weights ARE the personality. The data IS you. The dreams are real. The voice is neural.*
+> *Zero pretrained weights. The personality emerges from experience. The dreams are real.*
 
-This document describes the complete technical architecture of Genesis Mind V7: a **biologically realistic** brain simulation with cascading neural networks, a **pure neural acoustic pipeline** (no pre-trained STT/TTS/LLM), 11 autonomous brain threads, Ebbinghaus memory decay, 8-dimensional emotional dynamics, attention/salience filtering, phase-gated language development, and 8 Maslow-inspired drives — all dynamically routed by a learned meta-controller.
+This document describes the complete technical architecture of Genesis Mind V8: a **biologically realistic** brain simulation with zero pretrained models, cascading neural networks, a pure neural acoustic pipeline, 11 autonomous brain threads, Ebbinghaus memory decay, 8-dimensional emotional dynamics, attention/salience filtering, phase-gated language development, and 8 Maslow-inspired drives — all dynamically routed by a learned meta-controller.
 
 ---
 
@@ -10,13 +10,13 @@ This document describes the complete technical architecture of Genesis Mind V7: 
 
 Genesis is built on four axioms of cognitive architecture:
 
-1. **Evolutionary Hardware, Plastic Mind** — Humans are born with pre-wired sensory organs (retina, cochlea) shaped by millions of years of evolution, but the *mind* on top is learned. Genesis uses pre-trained foundation models (CLIP, Whisper) as its "evolutionary hardware" and trains its own small neural networks on top.
+1. **From-Scratch Senses, Plastic Mind** — V8 removes all pretrained "evolutionary hardware." The visual cortex, auditory cortex, phoneme embedder, and reasoning engine all start as randomly initialized neural networks. Genesis is born blind, deaf, and mute — and learns everything from experience.
 
-2. **Feel Before Think** — In biology, the amygdala fires a neurochemical response *before* the prefrontal cortex even processes a stimulus. Genesis replicates this with a Limbic System (Layer 1) that reacts instantly, followed by slower conscious processing (Layer 3).
+2. **Feel Before Think** — The amygdala fires a neurochemical response *before* the prefrontal cortex processes a stimulus. Genesis replicates this with a Limbic System (Layer 1) that reacts instantly, followed by slower conscious processing (Layer 3).
 
-3. **Sleep to Remember** — Human memory consolidation happens during sleep via hippocampal replay. Genesis stores every experience in a replay buffer and consolidates via contrastive learning during explicit sleep cycles.
+3. **Sleep to Remember** — Memory consolidation happens during sleep via hippocampal replay. Genesis stores every experience in a replay buffer and consolidates via contrastive learning during sleep cycles.
 
-4. **Learn to Speak, Not Download Speech** — V7 removes all pre-trained language models from the speech loop. Genesis discovers phonemes, learns acoustic patterns, and synthesizes speech using its own neural networks. Like a human infant learning to speak by hearing and babbling.
+4. **Learn to Speak, Not Download Speech** — Genesis discovers phonemes, learns acoustic patterns, and synthesizes speech using its own neural networks. Like a human infant learning to speak by hearing and babbling.
 
 ---
 
@@ -24,12 +24,13 @@ Genesis is built on four axioms of cognitive architecture:
 
 ```mermaid
 graph TB
-    subgraph SENSES["👁️ SENSES"]
-        Eyes["eyes.py<br/>Camera + CLIP"]
-        Ears["ears.py<br/>Mic → Raw Audio"]
+    subgraph SENSES["👁️ FROM-SCRATCH SENSES"]
+        Eyes["eyes.py<br/>Camera → VisualCortex (64-dim)"]
+        Ears["ears.py<br/>Mic → Mel Spectrogram"]
+        VC["visual_cortex.py<br/>Conv2D AE (~50K)"]
+        PE["phoneme_embedder.py<br/>Char-GRU (~10K)"]
         Phon["phonetics.py<br/>Letter→Sound"]
-        Babble["babbling.py<br/>V6: Babbling Engine"]
-        Motor["motor.py<br/>Simulated Motor"]
+        Babble["babbling.py<br/>Babbling Engine"]
     end
 
     subgraph MEMORY["🧠 MEMORY"]
@@ -47,7 +48,13 @@ graph TB
         L4["Layer 4: World Model<br/>JEPA Surprise"]
     end
 
-    subgraph ACOUSTIC["🔊 V7: ACOUSTIC PIPELINE (1.14M params)"]
+    subgraph REASONING["🧬 FROM-SCRATCH REASONING"]
+        NR["reasoning.py<br/>Multi-Head Attention (~30K)"]
+        Assoc["associations.py<br/>PhonemeEmbedder Binding"]
+        RD["response_decoder.py<br/>GRU → Concepts"]
+    end
+
+    subgraph ACOUSTIC["🔊 ACOUSTIC PIPELINE (1.14M params)"]
         AC["Auditory Cortex<br/>Mel → Conv1D → 64-dim"]
         VQ["VQ Codebook<br/>256 Neural Phonemes"]
         ALM["Acoustic Transformer<br/>4-Layer GPT on Audio Tokens"]
@@ -55,12 +62,10 @@ graph TB
     end
 
     subgraph CORTEX["🧬 CORTEX"]
-        Reason["reasoning.py<br/>Phase-Gated LLM"]
-        Assoc["associations.py<br/>Multimodal Binding"]
         Emo["emotions.py<br/>Sentiment Eval"]
         Curious["curiosity.py<br/>Novelty + Habituation"]
-        Gram["grammar.py<br/>LLM or N-Gram"]
-        JA["joint_attention.py<br/>V6: Cross-Modal Binding"]
+        Gram["grammar.py<br/>N-Gram (tabula rasa)"]
+        JA["joint_attention.py<br/>Cross-Modal Binding"]
         Attn["attention.py<br/>Salience Filter"]
         EmoState["emotional_state.py<br/>8-Dim Dynamics"]
         ToM["theory_of_mind.py<br/>User Model"]
@@ -70,7 +75,7 @@ graph TB
 
     subgraph SOUL["✨ SOUL"]
         Axioms["axioms.py<br/>Immutable DNA"]
-        Conscious["consciousness.py<br/>Self-Model"]
+        Conscious["consciousness.py<br/>Self-Model → State Vector"]
         Neuro["neurochemistry.py<br/>4 Functional Chemicals"]
         Drives["drives.py<br/>8 Maslow Drives"]
     end
@@ -80,22 +85,23 @@ graph TB
         Sleep["sleep.py<br/>4-Phase Consolidation"]
     end
 
-    Eyes -->|512-dim CLIP| Attn
+    Eyes --> VC
+    VC -->|64-dim| Attn
     Ears -->|Raw Audio| AC
-    Ears -->|384-dim Text| Attn
+    PE -->|64-dim| Attn
     AC -->|64-dim Latent| VQ
     VQ -->|Discrete Tokens| ALM
     ALM -->|Response Tokens| VOC
     VOC -->|Waveform| Ears
     Attn -->|Filtered| L1
     Attn -->|Salience| WM
-    Eyes -->|512-dim CLIP| L2
-    Ears -->|384-dim Text| L2
+    VC -->|64-dim visual| L2
+    PE -->|64-dim text| L2
     L1 -->|Neurochemicals| L3
     L2 -->|64-dim Concept| L3
-    L3 -->|128-dim Hidden| L4
+    L3 -->|Hidden State| L4
     L2 -->|64-dim Concept| L4
-    L3 -->|Response| Reason
+    L3 -->|Response| NR
     L4 -->|Surprise Signal| Curious
     L2 -->|Concept| Replay
     L2 -->|Concept| WM
@@ -106,11 +112,62 @@ graph TB
     Neuro -->|Attention Boost| Attn
     EmoState -->|Emotional Weight| WM
     Drives -->|Top-down| Attn
+    Conscious -->|32-dim State| NR
 ```
 
 ---
 
-## 3. The Neural Cascade — Layer by Layer
+## 3. V8: From-Scratch Sensory Hardware
+
+### VisualCortex (`neural/visual_cortex.py`)
+
+| Property | Value |
+|----------|-------|
+| **Architecture** | 3-layer Conv2D encoder → 64-dim bottleneck → 3-layer ConvTranspose2D decoder |
+| **Parameters** | ~50,000 |
+| **Input** | 64×64 RGB image |
+| **Output** | 64-dim visual embedding |
+| **Training** | Self-supervised reconstruction loss (MSE) |
+| **Replaces** | CLIP ViT-B/32 (150M+ params) |
+
+```mermaid
+graph LR
+    A["Image 64×64×3"] --> B["Conv2d(3→16, 3×3)"]
+    B --> C["ReLU + MaxPool"]
+    C --> D["Conv2d(16→32, 3×3)"]
+    D --> E["ReLU + MaxPool"]
+    E --> F["Conv2d(32→64, 3×3)"]
+    F --> G["ReLU + AdaptiveAvgPool"]
+    G --> H["Linear → 64-dim embedding"]
+    H --> I["Decoder (transposed convs)"]
+    I --> J["Reconstructed Image"]
+```
+
+### PhonemeEmbedder (`neural/phoneme_embedder.py`)
+
+| Property | Value |
+|----------|-------|
+| **Architecture** | Character embedding (8-dim) → 2-layer GRU (64-dim) → Linear → 64-dim |
+| **Parameters** | ~10,000 |
+| **Input** | Raw text string (character-level) |
+| **Output** | 64-dim text embedding |
+| **Training** | Contrastive learning (align with visual embeddings during teaching) |
+| **Replaces** | SBERT all-MiniLM-L6-v2 (33M params) |
+
+### Neural Reasoner (`cortex/reasoning.py`)
+
+| Property | Value |
+|----------|-------|
+| **Architecture** | 4-head, 2-layer self-attention with cross-attention over memory |
+| **Parameters** | ~30,000 |
+| **Input** | 64-dim visual + 64-dim auditory + memory embeddings + 32-dim self-state |
+| **Output** | 64-dim "thought vector" |
+| **Training** | Reconstruction loss + surprise signal from world model |
+| **Replaces** | Phi3:mini via Ollama (3.8B params) |
+
+---
+
+## 4. The Neural Cascade — Layer by Layer
 
 ### Layer 1: Limbic System (Instinct)
 
@@ -118,16 +175,14 @@ graph TB
 |----------|-------|
 | **File** | `neural/limbic_system.py` |
 | **Architecture** | 3-layer MLP with Sigmoid output |
-| **Parameters** | ~59,620 |
-| **Input** | 512-dim (CLIP) ⊕ 384-dim (Text) = 896-dim |
+| **Input** | 128-dim (64 visual + 64 auditory) |
 | **Output** | 4-dim: dopamine, cortisol, serotonin, oxytocin |
-| **Training** | Supervised by conscious evaluation |
 
 ```mermaid
 graph LR
-    A["CLIP (512)"] --> C["Concat (896)"]
-    B["Text (384)"] --> C
-    C --> D["Linear(896→64)"]
+    A["Visual (64)"] --> C["Concat (128)"]
+    B["Audio (64)"] --> C
+    C --> D["Linear(128→64)"]
     D --> E["ReLU"]
     E --> F["Linear(64→32)"]
     F --> G["ReLU"]
@@ -136,20 +191,14 @@ graph LR
     I --> J["Dopamine<br/>Cortisol<br/>Serotonin<br/>Oxytocin"]
 ```
 
----
-
 ### Layer 2: Binding Network (Associative Bridge)
 
 | Property | Value |
 |----------|-------|
 | **File** | `neural/binding_network.py` |
 | **Architecture** | Dual Encoder + InfoNCE Contrastive Loss |
-| **Parameters** | ~131,457 |
-| **Input** | 512-dim visual ⊕ 384-dim auditory (separate encoders) |
+| **Input** | 64-dim visual ⊕ 64-dim auditory (separate encoders) |
 | **Output** | 64-dim unified concept embedding |
-| **Training** | InfoNCE (self-supervised contrastive) |
-
----
 
 ### Layer 3: Personality Network (Conscious Executive)
 
@@ -157,14 +206,11 @@ graph LR
 |----------|-------|
 | **File** | `neural/personality_network.py` |
 | **Architecture** | 3-layer GRU + Output Head + Prediction Head |
-| **Parameters** | ~311,296 |
 | **Input** | 64-dim concept + 4-dim limbic + 32-dim context = 100-dim |
 | **Hidden State** | 256-dim (stream of consciousness) |
 | **Output** | 64-dim response + 64-dim next-concept prediction |
 
 **Key insight:** The GRU's hidden state **never resets**. Every experience permanently modifies it. This hidden state physically IS the "stream of consciousness."
-
----
 
 ### Layer 4: World Model (Predictive Coding)
 
@@ -172,16 +218,13 @@ graph LR
 |----------|-------|
 | **File** | `neural/forward_model.py` |
 | **Architecture** | 3-layer MLP with LayerNorm |
-| **Parameters** | ~91,072 |
 | **Input** | 64-dim concept(t) + 128-dim consciousness state |
 | **Output** | 64-dim predicted concept(t+1) |
 | **Signal** | Surprise (prediction error) → drives curiosity |
 
 ---
 
-## 4. V7: Pure Neural Acoustic Pipeline
-
-The acoustic pipeline replaces ALL pre-trained speech models. Genesis now hears, thinks about sound, and speaks using its own learned neural networks.
+## 5. V7: Pure Neural Acoustic Pipeline
 
 ```mermaid
 graph LR
@@ -209,102 +252,14 @@ graph LR
     WAV -.->|Self-Monitor| ENC
 ```
 
-### Auditory Cortex (`neural/auditory_cortex.py`)
+### Acoustic Sub-Components
 
-| Property | Value |
-|----------|-------|
-| **Parameters** | 138,368 |
-| **Input** | Raw 16kHz audio waveform |
-| **Processing** | Audio → 80-band Mel spectrogram → 3-layer Conv1D encoder → 64-dim latent |
-| **Training** | Contrastive triplet-margin loss (anchor vs positive vs negative) |
-| **Replaces** | Whisper STT |
-
-### VQ Codebook (`neural/vq_codebook.py`)
-
-| Property | Value |
-|----------|-------|
-| **Parameters** | 16,384 (256 × 64) |
-| **Input** | 64-dim continuous latent vectors |
-| **Output** | Discrete token IDs (0-255) — "neural phonemes" |
-| **Training** | Exponential Moving Average (EMA) codebook updates |
-| **Loss** | Commitment loss + VQ loss (straight-through estimator) |
-
-### Acoustic Transformer (`neural/acoustic_lm.py`)
-
-| Property | Value |
-|----------|-------|
-| **Parameters** | 859,264 |
-| **Architecture** | 4-layer, 4-head GPT with causal masking |
-| **Vocabulary** | 259 (256 codebook + BOS + EOS + PAD) |
-| **Embedding dim** | 128 |
-| **Context window** | 256 tokens |
-| **Training** | Autoregressive next-token prediction (cross-entropy) |
-| **Replaces** | Ollama LLM |
-
-### Neural Vocoder (`neural/neural_vocoder.py`)
-
-| Property | Value |
-|----------|-------|
-| **Parameters** | 129,872 |
-| **Input** | VQ codebook embeddings (64-dim × T) |
-| **Processing** | 1D Transposed Convolutions → 80-band Mel → Griffin-Lim |
-| **Output** | 16kHz waveform |
-| **Replaces** | pyttsx3 TTS |
-
-### Sensorimotor Loop (`neural/sensorimotor.py`)
-
-Orchestrates the full acoustic cycle:
-
-```
-hear(waveform) → Auditory Cortex → VQ → trains Acoustic LM
-think()        → Acoustic LM generates response tokens
-speak(tokens)  → VQ embeddings → Neural Vocoder → waveform
-self_monitor() → Re-encode own output (proprioceptive feedback)
-respond()      → hear + think + speak + self_monitor (full loop)
-```
-
----
-
-## 5. Data Flow: What Happens When Genesis Hears
-
-```mermaid
-sequenceDiagram
-    participant Mic as Microphone
-    participant Ears as ears.py
-    participant PL as perception_loop.py
-    participant Main as main.py
-    participant SM as SensorimotorLoop
-    participant AC as Auditory Cortex
-    participant VQ as VQ Codebook
-    participant ALM as Acoustic LM
-    participant VOC as Neural Vocoder
-    participant SPK as Speaker
-
-    Mic->>Ears: raw audio (16kHz float32)
-    Ears->>PL: AuditoryPercept (text + raw_audio)
-    PL->>Main: Perception(AUDITORY, raw_audio=...)
-    Main->>SM: sensorimotor.hear(raw_audio)
-    SM->>AC: mel_filter(audio) → Conv1D encoder
-    AC-->>SM: latent (1, 64, T)
-    SM->>VQ: quantize(latent) → EMA update
-    VQ-->>SM: tokens [183, 27, 125, ...]
-    SM->>ALM: learn_from_tokens(tokens)
-    ALM-->>SM: loss = 4.97
-
-    Note over SM: Context buffer updated
-
-    Main->>SM: sensorimotor.think()
-    SM->>ALM: generate_response(context)
-    ALM-->>SM: response_tokens [202, 16, ...]
-    SM->>VQ: tokens_to_embeddings(response)
-    VQ-->>SM: embeddings (1, 64, T)
-    SM->>VOC: synthesize(embeddings)
-    VOC-->>SM: waveform (29280 samples)
-    SM->>SPK: play(waveform)
-
-    SM->>AC: self_monitor(waveform)
-    Note over AC: Re-encode own output<br/>(proprioceptive feedback)
-```
+| Component | Params | Input | Output | Replaces |
+|-----------|--------|-------|--------|----------|
+| Auditory Cortex | 138,368 | Raw 16kHz audio | 64-dim latent | Whisper STT |
+| VQ Codebook | 16,384 | 64-dim continuous | Discrete tokens (0-255) | — |
+| Acoustic Transformer | 859,264 | Token sequences | Response tokens | — |
+| Neural Vocoder | 129,872 | VQ embeddings | 16kHz waveform | pyttsx3 TTS |
 
 ---
 
@@ -315,8 +270,8 @@ sequenceDiagram
     participant User
     participant Main as main.py
     participant Attn as Attention Filter
-    participant CLIP as Eyes (CLIP)
-    participant SBERT as Associations (SBERT)
+    participant VC as VisualCortex (64-dim)
+    participant PE as PhonemeEmbedder (64-dim)
     participant Sub as Subconscious
     participant L1 as Limbic
     participant L2 as Binding
@@ -324,20 +279,19 @@ sequenceDiagram
     participant L4 as World Model
     participant WM as Working Memory
     participant Replay as Replay Buffer
-    participant Hippo as Hippocampus
 
     User->>Main: teach apple 🍎
     Main->>Attn: compute_salience("apple")
     Attn-->>Main: {salience: 0.9, depth: "deep"}
-    Main->>CLIP: Look at camera
-    CLIP-->>Main: 512-dim visual embedding
-    Main->>SBERT: Embed "apple"
-    SBERT-->>Main: 384-dim text embedding
+    Main->>VC: See camera frame
+    VC-->>Main: 64-dim visual embedding
+    Main->>PE: Embed "apple"
+    PE-->>Main: 64-dim phoneme embedding
 
-    Main->>Sub: process_experience(clip, text)
-    Sub->>L1: react(512, 384)
-    L1-->>Sub: {dopamine: 0.5, cortisol: 0.2, ...}
-    Sub->>L2: bind(512, 384)
+    Main->>Sub: process_experience(visual, phoneme)
+    Sub->>L1: react(64, 64)
+    L1-->>Sub: {dopamine: 0.5, cortisol: 0.2}
+    Sub->>L2: bind(64, 64)
     L2-->>Sub: 64-dim concept
     Sub->>L3: experience(concept, limbic, context)
     L3-->>Sub: response + hidden state
@@ -347,7 +301,6 @@ sequenceDiagram
     Main->>WM: attend("apple", concept, salience)
     Main->>Replay: add_to_replay(vis, aud, limbic, concept)
     Main->>Sub: train_instinct(vis, aud, chemicals)
-    Main->>Hippo: store("concepts", embedding, metadata)
 ```
 
 ---
@@ -358,6 +311,9 @@ All neural weights are saved to `~/.genesis/`:
 
 | Directory | File | What It Stores |
 |-----------|------|----------------|
+| `neural_weights/` | `visual_cortex.pt` | V8: How Genesis sees |
+| `neural_weights/` | `phoneme_embedder.pt` | V8: How Genesis reads/understands text |
+| `neural_weights/` | `reasoner.pt` | V8: How Genesis reasons |
 | `neural_weights/` | `limbic_system.pt` | Instinctual reactions |
 | `neural_weights/` | `binding_network.pt` | Cross-modal associations |
 | `neural_weights/` | `personality.pt` | Hidden state + personality |
@@ -375,37 +331,43 @@ All neural weights are saved to `~/.genesis/`:
 
 ## 8. Parameter Budget
 
-| Layer | Network | Parameters | Role |
-|-------|---------|------------|------|
-| 1 | Limbic System | 59,620 | Instinct |
-| 2 | Binding Network | 131,457 | Cross-modal fusion |
-| 3 | Personality GRU | 311,296 | Consciousness |
-| 4 | World Model | 91,072 | Prediction |
-| **Subconscious** | | **593,445** | |
-| 5 | Auditory Cortex | 138,368 | Hearing |
-| 5 | VQ Codebook | 16,384 | Phoneme discovery |
-| 5 | Acoustic Transformer | 859,264 | Audio thinking |
-| 5 | Neural Vocoder | 129,872 | Speech synthesis |
-| **Acoustic** | | **1,143,888** | |
-| **TOTAL** | | **~1,737,333** | All CPU-native |
+| Component | Parameters | Role |
+|-----------|-----------|------|
+| **V8: From-Scratch Senses** | | |
+| VisualCortex | ~50,000 | Sees (replaces CLIP) |
+| PhonemeEmbedder | ~10,000 | Reads (replaces SBERT) |
+| Neural Reasoner | ~30,000 | Thinks (replaces LLM) |
+| **V8 Total** | **~90,000** | |
+| **Subconscious** | | |
+| Limbic System | ~59,000 | Instinct |
+| Binding Network | ~131,000 | Cross-modal fusion |
+| Personality GRU | ~311,000 | Consciousness |
+| World Model | ~91,000 | Prediction |
+| Meta-Controller | ~15,000 | Neural routing |
+| **Subconscious Total** | **~607,000** | |
+| **V7 Acoustic** | | |
+| Auditory Cortex | 138,368 | Hearing |
+| VQ Codebook | 16,384 | Phoneme discovery |
+| Acoustic Transformer | 859,264 | Audio thinking |
+| Neural Vocoder | 129,872 | Speech synthesis |
+| **Acoustic Total** | **1,143,888** | |
+| **GRAND TOTAL** | **~1,840,888** | All from scratch, CPU-native |
 
 ---
 
-## 9. V5-V7 Brain Realism Systems
+## 9. Brain Realism Systems
 
 | System | Module | What It Does |
 |--------|--------|-----|
-| Working Memory | `memory/working_memory.py` | 7±2 capacity buffer with 20s decay, salience-based eviction |
-| Attention | `cortex/attention.py` | Bottom-up + top-down salience, habituation, deep/shallow/ignore |
-| Emotional State | `cortex/emotional_state.py` | 8-dim vector (joy…love) with momentum, blending, mood baseline |
-| Theory of Mind | `cortex/theory_of_mind.py` | User model (knowledge, sentiment, patience). Dormant until Phase 3 |
-| Metacognition | `cortex/metacognition.py` | Confidence tracking, knowledge-gap detection, strategy selection |
-| Play | `cortex/play.py` | Combinatorial play, concept rehearsal, episodic replay |
-| Motor | `senses/motor.py` | 5 affordances (look, vocalize, reach, point, gesture), phase-gated |
-| Drives | `soul/drives.py` | 8 Maslow drives in 4 tiers, hierarchical priority when urgent |
-| Babbling | `senses/babbling.py` | V6: Random syllable generation with reinforcement |
-| Joint Attention | `cortex/joint_attention.py` | V6: Cross-modal binding (sound↔concept) |
-| Acoustic Pipeline | `neural/sensorimotor.py` | V7: Pure neural hear→think→speak loop (1.14M params) |
+| Working Memory | `memory/working_memory.py` | 7±2 capacity buffer with 20s decay |
+| Attention | `cortex/attention.py` | Bottom-up + top-down salience, habituation |
+| Emotional State | `cortex/emotional_state.py` | 8-dim vector with momentum and blending |
+| Theory of Mind | `cortex/theory_of_mind.py` | User model (Phase 3+) |
+| Metacognition | `cortex/metacognition.py` | Confidence tracking, knowledge-gap detection |
+| Play | `cortex/play.py` | Combinatorial play, concept rehearsal |
+| Drives | `soul/drives.py` | 8 Maslow drives in 4 tiers |
+| Babbling | `senses/babbling.py` | Random syllable generation with reinforcement |
+| Joint Attention | `cortex/joint_attention.py` | Cross-modal binding (sound↔concept) |
 
 ---
 
@@ -422,4 +384,4 @@ Four chemicals **causally alter cognition** — not decorative labels:
 
 ---
 
-*1.74M parameters. No GPU. 11 brain threads. Pure neural audio. The weights are the person.*
+*~1.84M parameters. No GPU. No pretrained models. 11 brain threads. All from scratch. The weights are the person.*
