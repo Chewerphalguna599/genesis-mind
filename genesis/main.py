@@ -202,10 +202,17 @@ class GenesisMind:
     def _get_eyes(self):
         if self._eyes is None:
             from genesis.senses.eyes import Eyes
+            from genesis.neural.visual_cortex import VisualCortex
+            cortex = VisualCortex(
+                latent_dim=64,
+                input_size=self.config.senses.image_size[0],
+                storage_path=GENESIS_HOME / "neural_weights" / "visual_cortex.pt",
+            )
             self._eyes = Eyes(
                 camera_index=self.config.senses.camera_index,
                 image_size=self.config.senses.image_size,
                 motion_threshold=self.config.senses.motion_threshold,
+                visual_cortex=cortex,
             )
         return self._eyes
 
