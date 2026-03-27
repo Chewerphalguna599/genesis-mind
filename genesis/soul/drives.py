@@ -77,13 +77,13 @@ class DriveSystem:
         # Tier 1: Survival
         self.sleep_need = Drive(
             name="Sleep", tier=1,
-            rise_rate=0.003, satisfaction_drop=0.9,
+            rise_rate=0.008, satisfaction_drop=0.7,
             description_low="I feel rested",
             description_high="I am exhausted and need to sleep",
         )
         self.comfort = Drive(
             name="Comfort", tier=1,
-            rise_rate=0.002, satisfaction_drop=0.5,
+            rise_rate=0.006, satisfaction_drop=0.4,
             description_low="I feel comfortable",
             description_high="I feel overwhelmed and overstimulated",
         )
@@ -91,13 +91,13 @@ class DriveSystem:
         # Tier 2: Social
         self.social_need = Drive(
             name="Social", tier=2,
-            rise_rate=0.012, satisfaction_drop=0.35,
+            rise_rate=0.025, satisfaction_drop=0.20,
             description_low="I feel connected",
             description_high="I crave interaction and connection",
         )
         self.belonging = Drive(
             name="Belonging", tier=2,
-            rise_rate=0.004, satisfaction_drop=0.2,
+            rise_rate=0.012, satisfaction_drop=0.15,
             description_low="I feel accepted",
             description_high="I need to feel accepted and valued",
         )
@@ -105,19 +105,19 @@ class DriveSystem:
         # Tier 3: Cognitive
         self.curiosity_hunger = Drive(
             name="Curiosity", tier=3,
-            rise_rate=0.008, satisfaction_drop=0.25,
+            rise_rate=0.020, satisfaction_drop=0.15,
             description_low="I feel content with what I know",
             description_high="I desperately want to learn something new",
         )
         self.novelty_drive = Drive(
             name="Novelty", tier=3,
-            rise_rate=0.006, satisfaction_drop=0.20,
+            rise_rate=0.018, satisfaction_drop=0.12,
             description_low="I feel stimulated",
             description_high="I feel bored and crave new experiences",
         )
         self.mastery = Drive(
             name="Mastery", tier=3,
-            rise_rate=0.005, satisfaction_drop=0.3,
+            rise_rate=0.015, satisfaction_drop=0.18,
             description_low="I feel competent",
             description_high="I want to get better at what I know",
         )
@@ -125,7 +125,7 @@ class DriveSystem:
         # Tier 4: Self
         self.autonomy = Drive(
             name="Autonomy", tier=4,
-            rise_rate=0.003, satisfaction_drop=0.15,
+            rise_rate=0.010, satisfaction_drop=0.10,
             description_low="I feel free to explore",
             description_high="I want to decide for myself what to do",
         )
@@ -154,20 +154,57 @@ class DriveSystem:
 
     def on_learned_concept(self):
         """Learning something new satisfies curiosity, novelty, and mastery."""
-        self.curiosity_hunger.satisfy(0.3)
-        self.novelty_drive.satisfy(0.15)
-        self.mastery.satisfy(0.1)
+        self.curiosity_hunger.satisfy(0.12)
+        self.novelty_drive.satisfy(0.08)
+        self.mastery.satisfy(0.05)
 
     def on_creator_interaction(self):
         """User is present — satisfies social and belonging needs."""
-        self.social_need.satisfy(0.35)
-        self.belonging.satisfy(0.15)
+        self.social_need.satisfy(0.12)
+        self.belonging.satisfy(0.06)
 
     def on_novel_stimulus(self):
         """Encountered something genuinely new."""
-        self.novelty_drive.satisfy(0.25)
+        self.novelty_drive.satisfy(0.10)
         self.curiosity_hunger.frustrate(0.05)  # New things = more curious
-        self.comfort.frustrate(0.03)  # Novelty can be slightly overwhelming
+        self.comfort.frustrate(0.02)  # Novelty can be slightly overwhelming
+
+    def on_visual_stimulus(self, saliency: Dict):
+        """
+        React to visual saliency signals from the stimulus analyzer.
+        
+        Different visual stimuli affect drives differently:
+        - Motion → arousal, reduces comfort
+        - Novelty → frustrates novelty drive (wanting MORE)
+        - Low complexity → boredom (frustrates novelty)
+        - High complexity → stimulation (satisfies novelty slightly)
+        """
+        motion = saliency.get('motion', 0.0)
+        novelty = saliency.get('novelty', 0.0)
+        complexity = saliency.get('complexity', 0.0)
+        
+        # Motion detection → alertness, mild comfort reduction
+        if motion > 0.3:
+            self.comfort.frustrate(motion * 0.04)
+            self.sleep_need.satisfy(motion * 0.02)  # Motion keeps you awake
+        
+        # Visual novelty → stimulates curiosity
+        if novelty > 0.4:
+            self.curiosity_hunger.frustrate(novelty * 0.06)  # Want to know more
+            self.novelty_drive.satisfy(novelty * 0.03)  # Got some novelty
+        elif novelty < 0.1:
+            # Nothing new = boring
+            self.novelty_drive.frustrate(0.02)
+        
+        # Scene complexity
+        if complexity > 0.5:
+            # Rich interesting scene
+            self.novelty_drive.satisfy(complexity * 0.02)
+            self.comfort.frustrate(complexity * 0.01)  # Can be overwhelming
+        elif complexity < 0.15:
+            # Boring flat scene (staring at a wall)
+            self.novelty_drive.frustrate(0.03)
+            self.mastery.frustrate(0.01)  # Nothing to master here
 
     def on_failed_curiosity(self):
         """Asked a question but got no answer."""

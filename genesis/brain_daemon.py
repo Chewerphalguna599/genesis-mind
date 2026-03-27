@@ -131,6 +131,12 @@ class BrainDaemon:
         self._co_occurrence_time = 0.0         # When co-occurrence last fired
         self._co_occurrence_window = 5.0       # Seconds to consider "simultaneous"
 
+        # ---- Visual Stimulus Analyzer ----
+        # Differentiates visual responses (motion, novelty, complexity, luminance)
+        from genesis.neural.visual_stimulus import VisualStimulusAnalyzer
+        self._visual_analyzer = VisualStimulusAnalyzer(history_size=30)
+        self._last_saliency = {}               # Latest saliency signals for dashboard
+
         # Configure all brain threads
         self._setup_threads()
 
@@ -572,8 +578,44 @@ class BrainDaemon:
             if percept is None:
                 return
 
-            # Only process significant visual changes (motion detected)
-            if not percept.is_significant:
+            # ═══ VISUAL STIMULUS ANALYSIS ═══
+            # Analyze raw frame for motion, novelty, complexity, luminance
+            # This is what makes Genesis react DIFFERENTLY to different scenes.
+            saliency = self._visual_analyzer.analyze(percept.image)
+            self._last_saliency = saliency
+            
+            # Feed saliency into the drive system
+            self.mind.drives.on_visual_stimulus(saliency)
+            
+            # Feed into emotional system
+            if saliency['motion'] > 0.4:
+                # Sudden motion → arousal + alertness
+                self.mind.neurochemistry.norepinephrine.spike(
+                    saliency['motion'] * 0.15
+                )
+                self.mind.emotional_state.dimensions['surprise'].nudge(
+                    saliency['motion'] * 0.3
+                )
+            
+            if saliency['novelty'] > 0.5:
+                # Novel scene → curiosity + dopamine
+                self.mind.neurochemistry.dopamine.spike(
+                    saliency['novelty'] * 0.1
+                )
+                self.mind.emotional_state.dimensions['interest'].nudge(
+                    saliency['novelty'] * 0.2
+                )
+            
+            if saliency['luminance_change'] < -0.3:
+                # Sudden darkness → mild anxiety
+                self.mind.emotional_state.on_experience(
+                    valence=-0.2,
+                    arousal=abs(saliency['luminance_change']) * 0.3,
+                    novelty=0.2
+                )
+
+            # Only process through neural cascade if visually significant
+            if not percept.is_significant and saliency['overall_saliency'] < 0.3:
                 return
 
             # Embed what we see through the VisualCortex

@@ -176,6 +176,17 @@ class DashboardServer:
                     'audio_age': round(now - getattr(bd, '_recent_audio_time', 0), 1) if getattr(bd, '_recent_audio_time', 0) > 0 else -1,
                     'co_occurrence_active': getattr(bd, '_co_occurrence_active', False) and (now - getattr(bd, '_co_occurrence_time', 0)) < 5.0,
                 }
+                
+                # Visual Saliency signals (from VisualStimulusAnalyzer)
+                saliency = getattr(bd, '_last_saliency', {})
+                if saliency:
+                    activations['visual_saliency'] = {
+                        'motion': round(saliency.get('motion', 0), 4),
+                        'novelty': round(saliency.get('novelty', 0), 4),
+                        'complexity': round(saliency.get('complexity', 0), 4),
+                        'luminance_change': round(saliency.get('luminance_change', 0), 4),
+                        'overall_saliency': round(saliency.get('overall_saliency', 0), 4),
+                    }
 
         except Exception as e:
             activations['error'] = str(e)
