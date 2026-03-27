@@ -40,6 +40,7 @@ class Voice:
         self._current_phase = 0
         self._babbling_engine: Optional[BabblingEngine] = None
         self._sensorimotor = None  # Injected from GenesisMind
+        self._acoustic_memory = None  # Injected from GenesisMind
 
         logger.info("Voice initialized (neural-only, rate=%d, volume=%.1f)", rate, volume)
 
@@ -50,6 +51,10 @@ class Voice:
     def set_sensorimotor(self, sensorimotor):
         """Connect the sensorimotor loop for neural audio synthesis."""
         self._sensorimotor = sensorimotor
+
+    def set_acoustic_memory(self, memory):
+        """Connect acoustic word memory for concept-based speech."""
+        self._acoustic_memory = memory
 
     def set_phase(self, phase: int):
         """Update the developmental phase for voice gating."""
@@ -74,7 +79,7 @@ class Voice:
         if self._current_phase <= 1:
             self.babble_random()
         elif self._sensorimotor:
-            # Try neural vocoder synthesis
+            # Try proto-speech: reproduce known word acoustic patterns
             thread = threading.Thread(
                 target=self._neural_speak, daemon=True
             )
@@ -82,16 +87,50 @@ class Voice:
         else:
             self.babble_random()
 
+    def say_concept(self, word: str):
+        """
+        Speak a specific learned concept by playing its stored
+        acoustic VQ tokens through the vocoder.
+
+        This is proto-speech — reproducing a previously heard
+        sound pattern for a known concept.
+        """
+        if not self._enabled or self._muted:
+            return
+        if not self._acoustic_memory or not self._sensorimotor:
+            self.babble_random()
+            return
+
+        tokens = self._acoustic_memory.get_exemplar_tokens(word)
+        if tokens:
+            thread = threading.Thread(
+                target=self._play_tokens, args=(tokens,), daemon=True
+            )
+            thread.start()
+        else:
+            self.babble_random()
+
+    def _play_tokens(self, tokens: list):
+        """Play VQ token sequence through the vocoder."""
+        with self._lock:
+            try:
+                if self._sensorimotor:
+                    waveform = self._sensorimotor.speak(tokens)
+                    if len(waveform) > 800:
+                        self._sensorimotor.vocoder.play(waveform)
+            except Exception as e:
+                logger.debug("Token playback failed: %s", e)
+
     def _neural_speak(self):
         """Generate and play neural audio through the sensorimotor loop."""
         with self._lock:
             try:
                 if self._sensorimotor:
-                    tokens = self._sensorimotor.acoustic_lm.generate(length=8)
-                    if tokens:
-                        waveform = self._sensorimotor.vocoder.synthesize(tokens)
-                        if len(waveform) > 800:
-                            self._sensorimotor.vocoder.play(waveform)
+                    waveform, tokens = self._sensorimotor.generate_spontaneous(
+                        max_tokens=15, temperature=0.9
+                    )
+                    if len(waveform) > 800:
+                        self._sensorimotor.vocoder.play(waveform)
             except Exception as e:
                 logger.debug("Neural vocalization failed: %s", e)
 

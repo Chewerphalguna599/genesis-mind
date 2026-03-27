@@ -57,6 +57,7 @@ from genesis.senses.motor import SimulatedMotor
 from genesis.senses.babbling import BabblingEngine
 from genesis.cortex.joint_attention import JointAttentionEngine
 from genesis.neural.sensorimotor import SensorimotorLoop
+from genesis.neural.acoustic_word_memory import AcousticWordMemory
 
 logger = logging.getLogger("genesis.main")
 
@@ -158,9 +159,15 @@ class GenesisMind:
             storage_path=MEMORY_DIR / "joint_attention.json",
         )
 
+        # --- V9: Acoustic Word Memory (DTW-based word recognition) ---
+        self.acoustic_word_memory = AcousticWordMemory(
+            storage_path=MEMORY_DIR / "acoustic_word_memory.json",
+        )
+
         # Wire babbling and sensorimotor into voice for neural vocalization
         self.voice.set_babbling_engine(self.babbling_engine)
         self.voice.set_sensorimotor(self.sensorimotor)
+        self.voice.set_acoustic_memory(self.acoustic_word_memory)
         self.voice.set_phase(self.development.current_phase)
 
         # --- V4: Proprioception (Internal Body Sense) ---
@@ -252,6 +259,23 @@ class GenesisMind:
                     logger.info("Captured visual for '%s'", word)
             except Exception as e:
                 logger.warning("Could not capture visual: %s (teaching without image)", e)
+
+        # V9: Capture mic audio → VQ tokens → store as acoustic exemplar
+        # This is how the concept's "sound" is learned
+        try:
+            ears = self._get_ears()
+            audio_percept = ears.listen_once(duration_sec=2.0)
+            if audio_percept and audio_percept.raw_audio is not None:
+                vq_tokens = self.sensorimotor.hear(audio_percept.raw_audio)
+                if vq_tokens and len(vq_tokens) >= 3:
+                    self.acoustic_word_memory.store_exemplar(
+                        word=word,
+                        vq_tokens=vq_tokens,
+                        timestamp=datetime.now().isoformat(),
+                    )
+                    logger.info("Stored acoustic exemplar for '%s' (%d tokens)", word, len(vq_tokens))
+        except Exception as e:
+            logger.debug("Could not capture audio for '%s': %s", word, e)
 
         # Create multimodal binding
         self.associations.create_binding(

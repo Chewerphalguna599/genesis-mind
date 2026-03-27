@@ -551,9 +551,14 @@ class BrainDaemon:
         """
         Always-on microphone — Genesis continuously hears the world.
 
-        Blocks its own thread to listen for a chunk of audio, transcribes it 
-        via the auditory cortex, runs it through the attention filter, and if it's salient, 
-        absorbs it into working memory and the neural cascade.
+        V9: No text transcription. Processes raw audio through:
+            1. SensorimotorLoop.hear() → VQ tokens
+            2. AcousticWordMemory.recognize() → DTW match against known words
+            3. Recognized words → grammar engine + working memory + semantic activation
+            4. Unknown sounds → curiosity spike
+
+        This is how an infant learns language — hearing sound patterns
+        and gradually mapping them to learned concepts.
         """
         try:
             ears = self.mind._get_ears()
@@ -562,44 +567,76 @@ class BrainDaemon:
 
             # Listen for 3 seconds
             result = ears.listen_once(duration_sec=3.0)
-            if not result or not result.is_speech or not result.text:
+            if not result or not result.is_speech:
+                return
+            if result.raw_audio is None:
                 return
 
-            text = result.text.strip()
-            if len(text) > 2:  # Filter out pure noise artifacts
-                self._emit(f"Heard: '{text}'", "👂")
+            # Someone is present → satisfy social drive
+            self.mind.drives.social_need.satisfy(0.2)
 
-                # Hearing voice = someone is present → partially satisfy social drive
-                self.mind.drives.social_need.satisfy(0.2)
+            # Step 1: Process through sensorimotor pipeline → VQ tokens
+            try:
+                vq_tokens = self.mind.sensorimotor.hear(result.raw_audio)
+            except Exception as e:
+                logger.debug("[auditory] Sensorimotor hear failed: %s", e)
+                return
 
-                # 1. Apply Attention Filter
-                salience = self.mind.attention.compute_salience(
-                    text, modality="auditory", 
-                    drive_states=self.mind.drives.get_status()
+            if not vq_tokens or len(vq_tokens) < 3:
+                return
+
+            # Step 2: DTW recognition — match against AcousticWordMemory
+            recognized = self.mind.acoustic_word_memory.segment_and_recognize(vq_tokens)
+
+            if recognized:
+                # We heard known words!
+                recognized_words = [r.word for r in recognized]
+                word_str = " ".join(recognized_words)
+                self._emit(f"'{word_str}'", "👂")
+
+                for r in recognized:
+                    # Step 3a: Feed to grammar engine — this is how Genesis
+                    # learns word sequences from hearing, not typing
+                    self.mind.grammar.learn_from_speech(r.word)
+
+                    # Step 3b: Activate concept in working memory
+                    self.mind.working_memory.attend(
+                        key=r.word, content=r.word,
+                        salience=r.confidence,
+                    )
+
+                    # Step 3c: Activate in semantic memory (strengthen the concept)
+                    concept = self.mind.semantic_memory.recall_concept(r.word)
+                    if concept and hasattr(concept, 'strength'):
+                        concept.strength = min(1.0, concept.strength + 0.05)
+
+                    # Step 3d: Reinforce babbling when words are recognized
+                    try:
+                        self.mind.babbling_engine.reinforce_last(amount=r.confidence * 0.3)
+                    except Exception:
+                        pass  # Not critical if babbling reinforcement fails
+
+                # Dopamine reward for successful recognition
+                self.mind.neurochemistry.dopamine.spike(0.05 * len(recognized))
+
+                # Process through neural cascade
+                context_vec = self.mind.proprioception.get_context_vector()
+                self.mind.subconscious.process_experience(
+                    clip_embedding=None,
+                    text_embedding=None,
+                    context=context_vec,
+                    train=True,
                 )
 
-                if salience > 0.4:
-                    # 2. Place in Working Memory
-                    self.mind.working_memory.attend(key=text, content=text, salience=salience)
+            else:
+                # Unknown sound — no words recognized
+                # This is still a learning signal (novel acoustic data)
+                token_str = "-".join(str(t) for t in vq_tokens[:8])
+                logger.debug("[auditory] Unrecognized: [%s...] (%d tokens)", token_str, len(vq_tokens))
 
-                    # 3. Embed text
-                    try:
-                        # Assuming associations engine is available
-                        embedding = self.mind.subconscious.binding.encode_text(text)
-                    except Exception as e:
-                        logger.debug("[auditory] Text embed failed: %s", e)
-                        return
-
-                    # 4. Neural Cascade (The brain absorbs the speech)
-                    context_vec = self.mind.proprioception.get_context_vector()
-                    self.mind.subconscious.process_experience(
-                        clip_embedding=None,
-                        text_embedding=embedding,
-                        context=context_vec,
-                        train=True,
-                    )
-                    
-                    self.mind.neurochemistry.serotonin.spike(0.02)
+                # Curiosity spike for unknown sounds (if energetic enough)
+                if result.energy > 0.02:
+                    self.mind.neurochemistry.cortisol.spike(0.01)  # Mild stress from unknown
 
         except Exception as e:
             logger.debug("[auditory] Mic not available: %s", e)
