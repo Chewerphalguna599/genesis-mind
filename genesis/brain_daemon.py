@@ -569,6 +569,20 @@ class BrainDaemon:
                 )
                 self._emit(f"👁 {self._phase_say('curiosity')}", "🤔")
                 self.mind.neurochemistry.dopamine.spike(0.05)
+                
+                # Unsupervised Visual Discovery
+                concept_count = self.mind.semantic_memory.count()
+                if concept_count < 200:
+                    new_word = f"proto_vision_{concept_count + 1}"
+                    self.mind.semantic_memory.learn_concept(
+                        word=new_word,
+                        visual_embedding=embedding.tolist(),
+                        text_embedding=None,
+                        context="Autonomously discovered visual concept",
+                        description="A completely novel object seen by the camera"
+                    )
+                    self._emit(f"Autonomously learned new sight: '{new_word}'", "👶")
+
             elif surprise > 0.3:
                 self._emit(self._phase_say("wonder"), "👁")
 
@@ -679,6 +693,24 @@ class BrainDaemon:
 
             else:
                 # Unknown sound — no words recognized
+                # Unsupervised Acoustic Discovery
+                # If we hear a consistent sound burst we don't recognize, store it autonomously.
+                if 5 <= len(vq_tokens) <= 30:
+                    stats = self.mind.acoustic_word_memory.get_stats()
+                    vocab_size = stats.get("words", 0)
+                    
+                    # Prevent runaway vocabulary explosion from constant static noise
+                    if vocab_size < 200:
+                        from datetime import datetime
+                        new_word = f"proto_sound_{vocab_size + 1}"
+                        self.mind.acoustic_word_memory.store_exemplar(
+                            word=new_word,
+                            vq_tokens=vq_tokens,
+                            timestamp=datetime.now().isoformat()
+                        )
+                        self._emit(f"Autonomously learned new sound: '{new_word}'", "👶")
+                        self.mind.drives.curiosity_need.satisfy(0.1)
+
                 # This is still a learning signal (novel acoustic data)
                 token_str = "-".join(str(t) for t in vq_tokens[:8])
                 logger.debug("[auditory] Unrecognized: [%s...] (%d tokens)", token_str, len(vq_tokens))

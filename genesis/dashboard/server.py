@@ -317,12 +317,13 @@ class DashboardServer:
                 "replay_buffer": len(mind.subconscious.replay_buffer) if hasattr(mind.subconscious, 'replay_buffer') else 0
             }
             
-            # 10. Language Acquisition (V6)
+            # 10. Language Acquisition (V6 -> V7)
             language_data = {
                 "grammar_mode": "unknown",
                 "babbling": {},
                 "joint_attention": {},
                 "ngram": {},
+                "acoustic_memory": {}
             }
             try:
                 language_data["grammar_mode"] = mind.grammar.mode
@@ -331,6 +332,11 @@ class DashboardServer:
                 if hasattr(mind, 'joint_attention'):
                     language_data["joint_attention"] = mind.joint_attention.get_status()
                 language_data["ngram"] = mind.grammar.get_ngram_stats()
+                
+                # V7: Pure acoustic vocabulary
+                if hasattr(mind, 'acoustic_word_memory'):
+                    language_data["acoustic_memory"] = mind.acoustic_word_memory.get_stats()
+                    
             except Exception as e:
                 logger.error("Failed to build language data: %s", e)
             state["language_acquisition"] = language_data

@@ -620,29 +620,38 @@ function updateUI(state) {
         drivesChart.update('none');
     }
 
-    // Language Acquisition (V6)
+    // Language Acquisition (V6 -> V7 Acoustic Memory)
     if (state.language_acquisition) {
         const la = state.language_acquisition;
         const modeTag = document.getElementById('grammar-mode-tag');
-        if (modeTag) modeTag.textContent = la.grammar_mode || 'unknown';
+        if (modeTag) modeTag.textContent = la.grammar_mode || 'acoustic_v7';
 
-        // Vocabulary stats
+        // Vocabulary stats (mapped to V7 Acoustic Memory)
         const vocabSize = document.getElementById('la-vocab-size');
         const wordsHeard = document.getElementById('la-words-heard');
         const sentencesHeard = document.getElementById('la-sentences-heard');
-        if (vocabSize && la.joint_attention) vocabSize.textContent = la.joint_attention.vocabulary_size || 0;
-        if (wordsHeard && la.ngram) wordsHeard.textContent = (la.ngram.total_words_heard || 0).toLocaleString();
-        if (sentencesHeard && la.ngram) sentencesHeard.textContent = la.ngram.total_sentences_heard || 0;
+        
+        if (vocabSize) {
+            vocabSize.textContent = la.acoustic_memory?.words || la.joint_attention?.vocabulary_size || 0;
+        }
+        if (wordsHeard) {
+            wordsHeard.textContent = (la.acoustic_memory?.total_recognitions || la.ngram?.total_words_heard || 0).toLocaleString();
+        }
+        if (sentencesHeard) {
+            sentencesHeard.textContent = la.ngram?.total_sentences_heard || 0; // V7 does not track sentences yet
+        }
 
         // Babbling stats
         const repertoire = document.getElementById('la-repertoire');
         const babbles = document.getElementById('la-babbles');
         const reinforcements = document.getElementById('la-reinforcements');
         const lastBabble = document.getElementById('la-last-babble');
-        if (repertoire && la.babbling) repertoire.textContent = la.babbling.repertoire_size || 0;
-        if (babbles && la.babbling) babbles.textContent = la.babbling.total_babbles || 0;
-        if (reinforcements && la.babbling) reinforcements.textContent = la.babbling.total_reinforcements || 0;
-        if (lastBabble && la.babbling) lastBabble.textContent = la.babbling.last_babble || '---';
+        
+        // Use v6 babbling if it exists, otherwise pull from V7 vocoder
+        if (repertoire) repertoire.textContent = la.babbling?.repertoire_size || 0;
+        if (babbles) babbles.textContent = state.acoustic_pipeline?.vocoder?.total_syntheses || la.babbling?.total_babbles || 0;
+        if (reinforcements) reinforcements.textContent = la.babbling?.total_reinforcements || 0;
+        if (lastBabble) lastBabble.textContent = la.babbling?.last_babble || '---';
 
         // Cross-modal bindings
         const bindingsEl = document.getElementById('la-bindings');

@@ -323,6 +323,31 @@ class Neuroplasticity:
             logger.info("  🧠 Personality GRU grew: hidden %d → %d, layers %d → %d",
                          old_hidden, new_hidden, old_layers, new_layers)
 
+            # ── Grow World Model ──
+            world_model = subconscious.world_model
+            wm = world_model.network
+            old_wm_hidden = world_model.hidden_dim
+            if new_hidden > old_wm_hidden:
+                concept_dim = world_model.concept_dim
+                old_net = wm.net
+                
+                wm.net = nn.Sequential(
+                    _grow_linear(old_net[0], concept_dim + new_hidden, new_hidden * 2),
+                    nn.LayerNorm(new_hidden * 2),
+                    nn.ReLU(),
+                    _grow_linear(old_net[3], new_hidden * 2, new_hidden),
+                    nn.ReLU(),
+                    _grow_linear(old_net[5], new_hidden, concept_dim)
+                )
+                world_model.hidden_dim = new_hidden
+                
+                world_model.optimizer = torch.optim.Adam(
+                    wm.parameters(),
+                    lr=world_model.optimizer.param_groups[0]['lr']
+                )
+                report["changes"]["world_model"] = {"hidden": f"{old_wm_hidden} → {new_hidden}"}
+                logger.info("  🧠 World Model grew: hidden %d → %d", old_wm_hidden, new_hidden)
+
         # ── Grow Meta-Controller ──
         meta = subconscious.meta_controller
         if target_mc > 64:

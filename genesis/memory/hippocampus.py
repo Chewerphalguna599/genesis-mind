@@ -75,7 +75,7 @@ class Hippocampus:
 
         for name in collection_names:
             self._collections[name] = self._client.get_or_create_collection(
-                name=name,
+                name=f"{name}_v7",
                 metadata={"hnsw:space": "cosine"},  # Cosine similarity
             )
 
