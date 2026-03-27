@@ -112,8 +112,20 @@ class BrainDaemon:
         # Speech cooldown timers — prevent repetitive babble spam
         self._last_social_emit = 0.0
         self._last_monologue_emit = 0.0
+        self._last_auto_respond = 0.0
         self._social_cooldown = 60.0    # Min seconds between social babbles
         self._monologue_cooldown = 45.0  # Min seconds between inner monologue
+        self._auto_respond_cooldown = 5.0  # Min seconds between auto-responses
+
+        # ---- Shared Sensory Buffers ----
+        # These allow cross-modal binding (co-occurrence learning)
+        # Vision and auditory threads deposit recent observations here.
+        # The co-occurrence thread checks for simultaneous signals.
+        self._recent_visual_embedding = None   # Last visual embedding (64-dim)
+        self._recent_visual_time = 0.0         # When it was captured
+        self._recent_heard_words = []          # Recently recognized words
+        self._recent_heard_time = 0.0          # When they were recognized
+        self._co_occurrence_window = 5.0       # Seconds to consider "simultaneous"
 
         # Configure all brain threads
         self._setup_threads()
@@ -292,6 +304,20 @@ class BrainDaemon:
             name="auditory",
             target=self._tick_auditory,
             interval_sec=0.5,  # Listen continuously (0.5s pause between chunks)
+        )
+
+        # Thread 12: Co-occurrence Learning — auto-teach from seeing + hearing
+        self._threads["co_occurrence"] = BrainThread(
+            name="co_occurrence",
+            target=self._tick_co_occurrence,
+            interval_sec=2.0,  # Check for co-occurring signals every 2s
+        )
+
+        # Thread 13: Autonomous Interaction — proactive communication
+        self._threads["auto_interact"] = BrainThread(
+            name="auto_interact",
+            target=self._tick_auto_interact,
+            interval_sec=15.0,  # Check every 15s if Genesis wants to say something
         )
 
     # =========================================================================
@@ -539,6 +565,11 @@ class BrainDaemon:
             elif surprise > 0.3:
                 self._emit(self._phase_say("wonder"), "👁")
 
+            # Store in shared sensory buffer for co-occurrence learning
+            import time as _time
+            self._recent_visual_embedding = embedding
+            self._recent_visual_time = _time.time()
+
         except Exception as e:
             # Camera might not be available — that's OK, we're just blind
             logger.debug("[vision] Camera not available: %s", e)
@@ -618,6 +649,17 @@ class BrainDaemon:
 
                 # Dopamine reward for successful recognition
                 self.mind.neurochemistry.dopamine.spike(0.05 * len(recognized))
+
+                # Store in shared sensory buffer for co-occurrence learning
+                import time as _time
+                self._recent_heard_words = recognized_words
+                self._recent_heard_time = _time.time()
+
+                # AUTO-RESPOND: When we recognize speech, respond naturally
+                now = _time.time()
+                if now - self._last_auto_respond >= self._auto_respond_cooldown:
+                    self._auto_respond(recognized_words)
+                    self._last_auto_respond = now
 
                 # Process through neural cascade
                 context_vec = self.mind.proprioception.get_context_vector()
@@ -748,6 +790,257 @@ class BrainDaemon:
             if concept:
                 concept.reinforce(context="episodic_replay")
                 mind.metacognition.on_recall_attempt(item.key, success=True)
+
+    # =========================================================================
+    # Auto-Response — respond to recognized speech automatically
+    # =========================================================================
+
+    def _auto_respond(self, recognized_words: list):
+        """
+        When Genesis recognizes words, it responds automatically.
+
+        Phase 0-1: Echolalic babble (mimics the sound pattern)
+        Phase 2: Echolalia + related concept activation
+        Phase 3+: Semantic response using reasoning engine
+
+        This replaces the need for the user to type 'ask' commands.
+        """
+        phase = self._get_phase()
+        mind = self.mind
+
+        if phase <= 1:
+            # ECHOLALIA: Repeat back what was heard (like a real infant)
+            # Try to play back the acoustic pattern of the first recognized word
+            first_word = recognized_words[0] if recognized_words else None
+            if first_word:
+                try:
+                    mind.voice.say_concept(first_word)
+                    self._emit(f"...{first_word}...", "🗣")
+                except Exception:
+                    babble = self._phase_say("social")
+                    self._emit(babble, "🗣")
+                    mind.voice.say(babble)
+
+        elif phase == 2:
+            # PROTO-RESPONSE: Echo + activate related concepts
+            response_words = list(recognized_words)
+            for word in recognized_words:
+                # Find associated concepts via semantic memory
+                concept = mind.semantic_memory.recall_concept(word)
+                if concept:
+                    # Get nearest neighbors in embedding space
+                    try:
+                        neighbors = mind.semantic_memory.get_nearest(
+                            word, n=2
+                        )
+                        for n in neighbors:
+                            if n.word not in response_words:
+                                response_words.append(n.word)
+                    except Exception:
+                        pass
+
+            # Speak the response
+            response = " ".join(response_words[:3])
+            self._emit(f"...{response}...", "🗣")
+            for w in response_words[:2]:
+                try:
+                    mind.voice.say_concept(w)
+                except Exception:
+                    pass
+
+        else:
+            # FULL RESPONSE: Use reasoning engine for semantic response
+            try:
+                context_vec = mind.proprioception.get_context_vector()
+                result = mind.subconscious.process_experience(
+                    clip_embedding=None,
+                    text_embedding=None,
+                    context=context_vec,
+                    train=False,
+                )
+                neural_voice = mind.subconscious.decode_response(
+                    result['personality_response'], mind.semantic_memory
+                )
+                if neural_voice and neural_voice not in ("(silence)", "(no words yet)"):
+                    self._emit(f"...{neural_voice}...", "🗣")
+                    mind.voice.say(neural_voice)
+                else:
+                    # Fall back to echoing + association
+                    response = " ".join(recognized_words[:2])
+                    self._emit(f"...{response}...", "🗣")
+            except Exception as e:
+                logger.debug("[auto-respond] Failed: %s", e)
+
+    # =========================================================================
+    # Thread 12: Co-occurrence Learning (Auto-Teach)
+    # =========================================================================
+
+    def _tick_co_occurrence(self):
+        """
+        Automatic cross-modal binding — the neural basis of language.
+
+        When Genesis SEES something AND HEARS a word at roughly the
+        same time (within 5s), it automatically creates a concept
+        binding between them — just like a parent pointing at an
+        apple and saying "apple".
+
+        This replaces the need for the 'teach' command. Learning
+        happens naturally from co-occurring sensory signals.
+        """
+        import time as _time
+        now = _time.time()
+
+        # Check if both modalities fired recently
+        visual_fresh = (
+            self._recent_visual_embedding is not None and
+            (now - self._recent_visual_time) < self._co_occurrence_window
+        )
+        auditory_fresh = (
+            len(self._recent_heard_words) > 0 and
+            (now - self._recent_heard_time) < self._co_occurrence_window
+        )
+
+        if not (visual_fresh and auditory_fresh):
+            return
+
+        # Co-occurrence detected! Bind what was seen with what was heard.
+        visual_emb = self._recent_visual_embedding
+        heard_words = self._recent_heard_words
+
+        for word in heard_words:
+            # Check if this binding already exists
+            existing = self.mind.semantic_memory.recall_concept(word)
+
+            if existing:
+                # Strengthen existing binding with new visual data
+                if hasattr(existing, 'strength'):
+                    existing.strength = min(1.0, existing.strength + 0.1)
+                logger.debug(
+                    "[co-occur] Strengthened '%s' (seen + heard together)",
+                    word,
+                )
+            else:
+                # NEW CONCEPT! Auto-learn from co-occurrence
+                try:
+                    text_embedding = self.mind.associations.embed_text(word).tolist()
+                    self.mind.semantic_memory.learn_concept(
+                        word=word,
+                        visual_embedding=visual_emb.tolist() if hasattr(visual_emb, 'tolist') else visual_emb,
+                        text_embedding=text_embedding,
+                        context="Learned from co-occurrence (heard while seeing)",
+                        description="Auto-learned concept",
+                        emotional_valence="+0.50",
+                    )
+                    self.mind.associations.create_binding(
+                        word=word,
+                        visual_embedding=visual_emb,
+                        context="Co-occurrence binding",
+                    )
+                    self.mind.neurochemistry.dopamine.spike(0.15)  # Big reward for learning!
+                    self._emit(f"📚 {word}", "🧠")
+                    logger.info(
+                        "[co-occur] AUTO-LEARNED '%s' from seeing + hearing!",
+                        word,
+                    )
+                except Exception as e:
+                    logger.debug("[co-occur] Failed to auto-learn '%s': %s", word, e)
+
+        # Clear the buffers to prevent re-firing
+        self._recent_heard_words = []
+
+    # =========================================================================
+    # Thread 13: Autonomous Interaction (Self-Initiated Communication)
+    # =========================================================================
+
+    def _tick_auto_interact(self):
+        """
+        Proactive communication — Genesis speaks when it wants to.
+
+        When drives are high enough, Genesis autonomously:
+        - Names things it sees (visual-to-word recall)
+        - Asks about novel objects (curiosity-driven)
+        - Babbles with purpose (high social drive)
+        - Rehearses known words (practice)
+
+        This replaces the need for any REPL interaction.
+        Genesis is alive and communicating on its own.
+        """
+        import time as _time
+        mind = self.mind
+        phase = self._get_phase()
+        now = _time.time()
+
+        # Don't interact too frequently
+        if now - self._last_auto_respond < self._auto_respond_cooldown:
+            return
+
+        drive_status = mind.drives.get_status()
+        social = drive_status.get('social', {}).get('level', 0)
+        curiosity = drive_status.get('curiosity', {}).get('level', 0)
+        novelty = drive_status.get('novelty', {}).get('level', 0)
+
+        # Priority 1: Curiosity about what we're seeing
+        if curiosity > 0.6 and self._recent_visual_embedding is not None:
+            # Try to name what we see
+            if phase >= 2 and mind.semantic_memory.count() > 0:
+                try:
+                    known = mind.semantic_memory.get_all_embeddings()
+                    surprise = mind.curiosity.compute_surprise(
+                        self._recent_visual_embedding, known
+                    )
+                    if surprise < 0.5:
+                        # Familiar — try to name it
+                        nearest = mind.semantic_memory.find_nearest(
+                            self._recent_visual_embedding, modality="visual", n=1
+                        )
+                        if nearest:
+                            word = nearest[0].word if hasattr(nearest[0], 'word') else str(nearest[0])
+                            self._emit(f"...{word}...", "👁")
+                            mind.voice.say_concept(word)
+                            self._last_auto_respond = now
+                            mind.drives.on_autonomous_action()
+                            return
+                except Exception:
+                    pass
+
+            # Unknown — express curiosity
+            self._emit(self._phase_say("curiosity"), "🤔")
+            mind.voice.say(self._phase_say("curiosity"))
+            self._last_auto_respond = now
+            return
+
+        # Priority 2: Social need — babble or say a known word
+        if social > 0.7:
+            vocab = mind.acoustic_word_memory.get_vocabulary()
+            if vocab and phase >= 2:
+                # Practice a random known word
+                import random
+                word = random.choice(vocab)
+                self._emit(f"...{word}...", "🗣")
+                mind.voice.say_concept(word)
+                mind.drives.social_need.satisfy(0.2)
+            else:
+                # Babble
+                msg = self._phase_say("social")
+                self._emit(msg, "🗣")
+                mind.voice.say(msg)
+                mind.drives.social_need.satisfy(0.15)
+            self._last_auto_respond = now
+            return
+
+        # Priority 3: Novelty — spontaneous neural vocalization
+        if novelty > 0.8 and mind.sensorimotor:
+            try:
+                waveform, tokens = mind.sensorimotor.generate_spontaneous(
+                    max_tokens=20, temperature=1.0
+                )
+                if len(waveform) > 800:
+                    mind.sensorimotor.vocoder.play(waveform)
+                    self._emit(self._phase_say("novelty"), "🎵")
+                    mind.drives.on_autonomous_action()
+            except Exception:
+                pass
+            self._last_auto_respond = now
 
     # =========================================================================
     # Stats
