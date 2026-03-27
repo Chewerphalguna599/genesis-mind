@@ -81,10 +81,10 @@ class Consciousness:
                 "summary": self._semantic.get_summary(),
             },
             "emotional_state": {
-                "label": emotional_state.label,
+                "label": "positive" if emotional_state.valence > 0.2 else ("negative" if emotional_state.valence < -0.2 else "neutral"),
                 "valence": emotional_state.valence,
                 "arousal": emotional_state.arousal,
-                "description": emotional_state.to_description(),
+                "description": f"Valence: {emotional_state.valence:+.2f}, Arousal: {emotional_state.arousal:.2f}",
             },
             "next_milestone": phase_info.get("next_phase"),
         }
