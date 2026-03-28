@@ -48,6 +48,15 @@ import numpy as np
 logger = logging.getLogger("genesis.growth.sleep")
 
 
+def _get_embedding(concept) -> Optional[np.ndarray]:
+    """Get the best available embedding from a concept (text or visual)."""
+    if concept.text_embedding is not None:
+        return np.array(concept.text_embedding, dtype=np.float32)
+    if concept.visual_embedding is not None:
+        return np.array(concept.visual_embedding, dtype=np.float32)
+    return None
+
+
 class SleepPhaseReport:
     """Report from a single sleep phase."""
 
@@ -247,6 +256,15 @@ class SleepCycle:
                 concept = semantic_memory.recall_concept(word)
                 if concept:
                     reinforced.add(word)
+
+        # Also reinforce all concepts that have visual embeddings
+        # (proto_vision concepts learned autonomously)
+        all_concepts = semantic_memory.get_all_concepts()
+        for c in all_concepts:
+            if c.visual_embedding is not None and c.strength > 0.05:
+                c.reinforce(context="sleep_consolidation")
+                reinforced.add(c.word)
+
         report["concepts_reinforced"] = len(reinforced)
 
         # Neural consolidation via replay buffer — 3 EPOCHS for stronger consolidation
@@ -269,31 +287,31 @@ class SleepCycle:
         report["replay_epochs"] = total_batches
         report["loss_per_epoch"] = [round(l, 4) for l in epoch_losses]
 
-        # Binding reconstruction pass — verify cross-modal consistency
-        reconstruction_loss = 0.0
-        reconstruction_count = 0
-        if subconscious:
-            import numpy as np
-            concepts = semantic_memory.get_all_concepts()
-            for c in concepts[:20]:  # Test up to 20 concepts for speed
-                if c.visual_embedding is not None and c.text_embedding is not None:
-                    try:
-                        v = np.array(c.visual_embedding, dtype=np.float32)
-                        a = np.array(c.text_embedding, dtype=np.float32)
-                        # Bind and check reconstruction similarity
-                        bound = subconscious.binding_network.bind(v, a)
-                        # The bound embedding should be close to both projections
-                        norm = np.linalg.norm(bound)
-                        if norm > 1e-6:
-                            reconstruction_loss += float(1.0 - np.dot(bound, bound / norm))
-                            reconstruction_count += 1
-                    except Exception:
-                        pass
+        # Visual similarity consolidation — cluster similar visual memories
+        visual_concepts = [c for c in all_concepts if c.visual_embedding is not None]
+        visual_relationships_found = 0
+        for i, c1 in enumerate(visual_concepts[:20]):
+            v1 = np.array(c1.visual_embedding, dtype=np.float32)
+            norm1 = np.linalg.norm(v1)
+            if norm1 < 1e-6:
+                continue
+            for c2 in visual_concepts[i+1:20]:
+                v2 = np.array(c2.visual_embedding, dtype=np.float32)
+                norm2 = np.linalg.norm(v2)
+                if norm2 < 1e-6:
+                    continue
+                sim = float(np.dot(v1, v2) / (norm1 * norm2))
+                # Visually similar concepts should be linked
+                if sim > 0.7 and c2.word not in c1.relationships:
+                    c1.relationships.append(c2.word)
+                    c2.relationships.append(c1.word)
+                    visual_relationships_found += 1
         
-        if reconstruction_count > 0:
-            report["binding_reconstruction_loss"] = round(reconstruction_loss / reconstruction_count, 4)
+        if visual_relationships_found > 0:
+            report["visual_relationships_discovered"] = visual_relationships_found
+            logger.info("    Discovered %d visual similarity relationships", visual_relationships_found)
         
-        report["neural_consolidated"] = avg_contrastive_loss > 0
+        report["neural_consolidated"] = avg_contrastive_loss > 0 or len(reinforced) > 0
 
         logger.info("    Reinforced %d concepts, avg contrastive loss: %.4f (%d epochs)",
                      len(reinforced), avg_contrastive_loss, total_batches)
@@ -332,20 +350,25 @@ class SleepCycle:
             return report
 
         # Dream: randomly combine concept pairs and check surprise
+        # Use whichever embedding is available (visual or text)
         for _ in range(self._dream_recombinations):
             # Pick 2 random concepts
             c1, c2 = random.sample(all_concepts, 2)
-            if c1.text_embedding is None or c2.text_embedding is None:
+            emb1 = _get_embedding(c1)
+            emb2 = _get_embedding(c2)
+            if emb1 is None or emb2 is None:
                 continue
 
             report["recombinations_tried"] += 1
             self._total_dreams += 1
 
+            # Match embedding dimensions (visual=64, text varies)
+            min_dim = min(len(emb1), len(emb2))
+            emb1_trimmed = emb1[:min_dim]
+            emb2_trimmed = emb2[:min_dim]
+
             # Recombine: average their embeddings (the "dream")
-            dream_embedding = (
-                np.array(c1.text_embedding, dtype=np.float32) +
-                np.array(c2.text_embedding, dtype=np.float32)
-            ) / 2.0
+            dream_embedding = (emb1_trimmed + emb2_trimmed) / 2.0
 
             # Check if the world model finds this combination surprising
             if subconscious and hasattr(subconscious, 'world_model'):
