@@ -199,7 +199,7 @@ class SleepCycle:
         # Apply forgetting curve
         semantic_memory.decay_all(dt_hours=self.decay_amount)
         if phonetics_engine:
-            phonetics_engine.decay_all(dt_hours=self.decay_amount)
+            phonetics_engine.decay_all(amount=self.decay_amount)
 
         # Prune dead concepts
         pruned = semantic_memory.prune_dead_concepts(threshold=self.pruning_threshold)
