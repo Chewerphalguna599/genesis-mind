@@ -850,7 +850,7 @@ class BrainDaemon:
                             timestamp=datetime.now().isoformat()
                         )
                         self._emit(f"Autonomously learned new sound: '{new_word}'", "👶")
-                        self.mind.drives.curiosity_need.satisfy(0.1)
+                        self.mind.drives.curiosity_hunger.satisfy(0.1)
 
                 # This is still a learning signal (novel acoustic data)
                 token_str = "-".join(str(t) for t in vq_tokens[:8])
@@ -1010,12 +1010,10 @@ class BrainDaemon:
                 if concept:
                     # Get nearest neighbors in embedding space
                     try:
-                        neighbors = mind.semantic_memory.get_nearest(
-                            word, n=2
-                        )
-                        for n in neighbors:
-                            if n.word not in response_words:
-                                response_words.append(n.word)
+                        related = mind.semantic_memory.find_related(word)
+                        for r in related:
+                            if r.word not in response_words:
+                                response_words.append(r.word)
                     except Exception:
                         pass
 
@@ -1175,11 +1173,11 @@ class BrainDaemon:
                     )
                     if surprise < 0.5:
                         # Familiar — try to name it
-                        nearest = mind.semantic_memory.find_nearest(
-                            self._recent_visual_embedding, modality="visual", n=1
+                        nearest = mind.semantic_memory.find_by_visual_similarity(
+                            self._recent_visual_embedding.tolist(), top_k=1
                         )
                         if nearest:
-                            word = nearest[0].word if hasattr(nearest[0], 'word') else str(nearest[0])
+                            word = nearest[0].word
                             self._emit(f"...{word}...", "👁")
                             mind.voice.say_concept(word)
                             self._last_auto_respond = now

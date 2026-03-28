@@ -295,11 +295,18 @@ class SemanticMemory:
         return len(self._concepts)
 
     def get_all_embeddings(self) -> List[np.ndarray]:
-        """Return all text embeddings for surprise/novelty comparison."""
+        """Return all embeddings for surprise/novelty comparison.
+        
+        Prefers text_embedding, falls back to visual_embedding.
+        This ensures autonomously learned proto_vision concepts
+        are included in novelty detection.
+        """
         embeddings = []
         for concept in self._concepts.values():
             if concept.text_embedding is not None:
                 embeddings.append(np.array(concept.text_embedding))
+            elif concept.visual_embedding is not None:
+                embeddings.append(np.array(concept.visual_embedding))
         return embeddings
 
     def get_all_concepts(self) -> List[Concept]:
